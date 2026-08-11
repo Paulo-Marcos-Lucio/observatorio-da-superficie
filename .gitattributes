@@ -1,0 +1,8 @@
+# O coletor roda em Linux (GitHub Actions) e é editado no Windows. Fixar LF no
+# repositório evita que um heredoc de workflow chegue no runner com CRLF e
+# quebre de um jeito difícil de diagnosticar.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary

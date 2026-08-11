@@ -1,0 +1,69 @@
+name: Invariantes
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "dados/**"
+      - "diario/**"
+      - "README.md"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  invariantes:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - run: pip install -r requisitos-dev.txt
+
+      - name: Testes
+        run: python -m pytest testes/ -q
+
+      - name: Lint
+        run: ruff check coletor testes
+
+      - name: Formatação
+        run: ruff format --check coletor testes
+
+  coleta-a-seco:
+    # O coletor precisa continuar importável e executável mesmo que a rede
+    # falhe. Este job roda contra um alvo que não existe: o esperado é que
+    # todas as sondas voltem `inconclusivo` e o processo saia com 0 — se ele
+    # explodir, a coleta diária morreria inteira por causa de um alvo ruim.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Alvo inexistente não derruba a coleta
+        run: |
+          set -euo pipefail
+          printf -- '- host: alvo-que-nao-existe.invalid\n  classe: proprio\n  justificativa: "teste"\n' > /tmp/alvos-teste.yml
+          python coletor/coleta.py --alvos /tmp/alvos-teste.yml --saida /tmp/dados-teste
+          python - <<'PY'
+          import json, pathlib
+          arquivo = next(pathlib.Path("/tmp/dados-teste").glob("*/*/*.json"))
+          coleta = json.loads(arquivo.read_text(encoding="utf-8"))
+          observacao = coleta["observacoes"][0]
+          estados = {s["sonda"]: s["status"] for s in observacao["sondas"]}
+          assert all(v == "inconclusivo" for v in estados.values()), estados
+          assert all(s.get("motivo") for s in observacao["sondas"]), "inconclusivo sem motivo"
+          assert observacao["postura"]["nota"] is None, "alvo inalcançável não pode ter nota"
+          print("ok — alvo inalcançável vira inconclusivo com motivo, sem nota")
+          PY

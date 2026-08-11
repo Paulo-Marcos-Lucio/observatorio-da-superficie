@@ -1,0 +1,59 @@
+# Observatório da Superfície
+
+Leitura diária e passiva da superfície pública de um punhado de alvos —
+cabeçalhos de segurança, TLS, DNS e Transparência de Certificados —
+guardada como série temporal para que a **mudança** fique visível.
+
+Um relatório de segurança tirado num dia só diz como o alvo estava naquele dia.
+O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certificado
+que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
+apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
+
+**Última coleta:** 2026-08-11T22:26:19+00:00 · **23/36 sondas conclusivas** · **1 coletas** na série
+
+## Postura observada
+
+| Alvo | Classe | Nota | HSTS | CSP | Enquadr. | nosniff | Referrer | security.txt | Cert. |
+|---|---|---|---|---|---|---|---|---|---|
+| `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 22d |
+| `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 40d |
+| `github.com` | referencia | **6.7** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 50d |
+| `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 61d |
+| `www.cloudflare.com` | referencia | · | · | · | · | · | · | barrado na borda | 66d |
+| `owasp.org` | referencia | · | · | · | · | · | · | barrado na borda | 55d |
+
+`·` significa **inconclusivo**: a sonda não conseguiu medir. Não é o mesmo que
+ausente, e este projeto nunca escreve um pelo outro.
+
+`⚠ meta` significa CSP entregue por `<meta http-equiv>` em vez de cabeçalho.
+Vale contra XSS, mas o navegador **descarta** `frame-ancestors`, `report-uri` e
+`sandbox` nessa forma — quem confia nela para barrar enquadramento não está
+barrando nada.
+
+## O que o observatório encontra na própria casa
+
+### `paulo-marcos-lucio.github.io` — nota 3.9
+
+- `+1.5` HSTS com max-age >= 180 dias
+- `+1.4` CSP em <meta> (crédito parcial)
+- `+1.0` :80 sobe para HTTPS
+
+## Como isto funciona
+
+- `alvos.yml` — a lista, com a justificativa de admissão de cada alvo.
+- `coletor/coleta.py` — as sondas. Só biblioteca padrão do Python, para que
+  continue rodando daqui a um ano sem manutenção de dependência.
+- `dados/serie.jsonl` — série append-only, uma linha por alvo por coleta.
+- `dados/AAAA/MM/*.json` — o instantâneo bruto de cada coleta.
+- `diario/` — o texto do que mudou, quando mudou.
+- [`REGRAS-DE-ENGAJAMENTO.md`](REGRAS-DE-ENGAJAMENTO.md) — o que é coletado, o que
+  nunca é coletado, e como pedir a remoção de um alvo.
+
+Nenhum valor de cookie é gravado, em nenhuma hipótese. Nenhuma sonda envia
+requisição que altere estado. Nenhum alvo é observado sem política pública que
+autorize a observação.
+
+---
+
+<sub>Painel gerado por `coletor/painel.py`. A coleta é automática; a lista de alvos,
+as regras e a leitura dos achados são decisão humana.</sub>

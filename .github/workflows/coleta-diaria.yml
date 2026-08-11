@@ -1,0 +1,92 @@
+name: Coleta
+
+# Duas coletas por dia. Uma medição diária isolada mostra estado; duas mostram
+# que a série é contínua e pegam mudança feita durante o expediente.
+#
+# Os minutos são propositalmente quebrados: agendamento no minuto :00 é o
+# horário em que o mundo inteiro agenda, e a fila do GitHub atrasa mais ali.
+on:
+  schedule:
+    - cron: "23 10 * * *"   # 07:23 em São Paulo
+    - cron: "41 22 * * *"   # 19:41 em São Paulo
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Observar só este host (vazio = todos)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  observar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Coletar
+        run: |
+          if [ -n "${{ inputs.host }}" ]; then
+            python coletor/coleta.py --host "${{ inputs.host }}"
+          else
+            python coletor/coleta.py
+          fi
+
+      - name: Gerar painel e diário
+        run: python coletor/painel.py
+
+      - name: Registrar
+        run: |
+          set -euo pipefail
+
+          # A autoria é do operador do observatório, não de um robô: o e-mail
+          # noreply da conta atribui a contribuição sem expor endereço pessoal
+          # num repositório público.
+          git config user.name  "Paulo Marcos Lucio"
+          git config user.email "96093111+Paulo-Marcos-Lucio@users.noreply.github.com"
+
+          git add dados diario README.md
+
+          if git diff --cached --quiet; then
+            echo "::warning::coleta não produziu diferença — nada a registrar"
+            exit 0
+          fi
+
+          MOMENTO=$(date -u +'%Y-%m-%dT%H:%MZ')
+          ALVOS=$(python - <<'PY'
+          import json, pathlib
+          arquivos = sorted(pathlib.Path("dados").glob("*/*/*.json"))
+          coleta = json.loads(arquivos[-1].read_text(encoding="utf-8"))
+          obs = coleta["observacoes"]
+          ok = sum(1 for o in obs for s in o["sondas"] if s["status"] == "ok")
+          total = sum(len(o["sondas"]) for o in obs)
+          print(f"{len(obs)} alvos, {ok}/{total} sondas conclusivas")
+          PY
+          )
+
+          MUDOU=""
+          if git diff --cached --name-only | grep -q '^diario/'; then
+            MUDOU=" — houve mudança na superfície observada"
+          fi
+
+          git commit -m "coleta ${MOMENTO}: ${ALVOS}${MUDOU}"
+
+          # Duas coletas podem se cruzar se uma atrasar na fila do GitHub.
+          # O rebase resolve; a série é append-only, então não há conflito real.
+          for tentativa in 1 2 3; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && break
+            sleep 5
+          done
+
+          git push origin "HEAD:${GITHUB_REF_NAME}"

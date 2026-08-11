@@ -1,0 +1,37 @@
+# Alvos do Observatório da Superfície
+#
+# REGRA DE ADMISSÃO (ver REGRAS-DE-ENGAJAMENTO.md):
+# um alvo só entra nesta lista se cair em uma destas duas classes —
+#
+#   classe: proprio      — propriedade do operador do observatório
+#   classe: referencia   — organização que publica política de divulgação de
+#                          vulnerabilidade ou programa de bug bounty público,
+#                          observada apenas de forma passiva (1 GET na raiz)
+#
+# Nenhum alvo é admitido "porque seria interessante". O campo `justificativa`
+# é obrigatório e precisa apontar para a política pública que autoriza a
+# observação. Alvo sem justificativa verificável não entra.
+
+- host: paulo-marcos-lucio.github.io
+  classe: proprio
+  justificativa: "site do operador do observatório"
+
+- host: github.com
+  classe: referencia
+  justificativa: "programa de bug bounty público — https://bounty.github.com/"
+
+- host: www.mozilla.org
+  classe: referencia
+  justificativa: "bug bounty público — https://www.mozilla.org/security/bug-bounty/"
+
+- host: www.cloudflare.com
+  classe: referencia
+  justificativa: "programa público via HackerOne — https://hackerone.com/cloudflare"
+
+- host: owasp.org
+  classe: referencia
+  justificativa: "fundação de segurança de aplicação, política pública de divulgação"
+
+- host: web.dev
+  classe: referencia
+  justificativa: "Google VRP — https://bughunters.google.com/about/rules/google-friends"
