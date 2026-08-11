@@ -1,6 +1,6 @@
 # O coletor roda com biblioteca padrão apenas — de propósito, para continuar
 # funcionando daqui a um ano sem manutenção de dependência.
 # Estas dependências existem só para desenvolver e testar.
-pytest==8.3.4
-hypothesis==6.122.3
-ruff==0.8.4
+pytest==9.1.1
+hypothesis==6.165.2
+ruff==0.16.2
