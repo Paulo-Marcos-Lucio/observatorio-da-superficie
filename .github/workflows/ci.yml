@@ -58,12 +58,29 @@ jobs:
           python coletor/coleta.py --alvos /tmp/alvos-teste.yml --saida /tmp/dados-teste
           python - <<'PY'
           import json, pathlib
+
           arquivo = next(pathlib.Path("/tmp/dados-teste").glob("*/*/*.json"))
           coleta = json.loads(arquivo.read_text(encoding="utf-8"))
           observacao = coleta["observacoes"][0]
-          estados = {s["sonda"]: s["status"] for s in observacao["sondas"]}
-          assert all(v == "inconclusivo" for v in estados.values()), estados
-          assert all(s.get("motivo") for s in observacao["sondas"]), "inconclusivo sem motivo"
+          sondas = {s["sonda"]: s for s in observacao["sondas"]}
+
+          # As sondas que precisam falar com o host não têm como concluir nada
+          # sobre um domínio que não resolve.
+          for nome in ("porta80", "cabecalhos", "tls", "security_txt"):
+              assert sondas[nome]["status"] == "inconclusivo", (nome, sondas[nome])
+
+          # A de DNS, por outro lado, CONCLUI: perguntar ao resolvedor e receber
+          # "não há registro para este nome" é uma medição bem-sucedida. Exigir
+          # `inconclusivo` aqui seria repetir, no teste, exatamente a confusão
+          # entre não-medir e medir-e-não-achar que o projeto existe para evitar.
+          assert sondas["dns"]["status"] in {"ok", "inconclusivo"}
+          if sondas["dns"]["status"] == "ok":
+              assert sondas["dns"]["a"] == [], "domínio .invalid não pode ter registro A"
+
+          for nome, sonda in sondas.items():
+              if sonda["status"] == "inconclusivo":
+                  assert sonda.get("motivo"), f"{nome}: inconclusivo sem motivo é silêncio"
+
           assert observacao["postura"]["nota"] is None, "alvo inalcançável não pode ter nota"
           print("ok — alvo inalcançável vira inconclusivo com motivo, sem nota")
           PY
