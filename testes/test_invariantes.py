@@ -17,6 +17,7 @@ from hypothesis import strategies as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "coletor"))
 
 import coleta  # noqa: E402
+import painel  # noqa: E402
 
 # --------------------------------------------------------------------------
 # 1. Nenhuma sonda devolve silêncio
@@ -379,6 +380,128 @@ def test_parser_de_alvos_ignora_comentario(tmp_path):
 
     assert [a["host"] for a in alvos] == ["a.test", "b.test"]
     assert alvos[0]["justificativa"] == "minha"
+
+
+# --------------------------------------------------------------------------
+# 8. O diário não pode gritar todo dia
+# --------------------------------------------------------------------------
+
+
+@given(
+    a=st.text(alphabet="ABCDEFabcdef0123456789+/=", min_size=16, max_size=44),
+    b=st.text(alphabet="ABCDEFabcdef0123456789+/=", min_size=16, max_size=44),
+)
+def test_rotacao_de_nonce_nao_e_mudanca_de_politica(a, b):
+    """Nonce de CSP muda a cada resposta — é assim que ele funciona.
+
+    Sem neutralizar isso, o diário registraria "a CSP mudou" duas vezes por dia
+    para sempre, em todo alvo que usa nonce. Um diário que grita todo dia é um
+    diário que ninguém lê, e um instrumento que dispara sempre não informa nada.
+    Mesma disciplina de falso-positivo que a suíte aplica em detector.
+    """
+    molde = "script-src 'strict-dynamic' 'nonce-{}'; object-src 'none'"
+
+    assert painel._normalizar(molde.format(a)) == painel._normalizar(molde.format(b))
+
+
+def test_mudanca_real_de_politica_continua_sendo_vista():
+    """O dual da invariante acima: silenciar ruído não pode silenciar sinal."""
+    antes = "script-src 'strict-dynamic' 'nonce-AAAA'; object-src 'none'"
+    agora = "script-src 'unsafe-inline' 'nonce-BBBB'; object-src 'none'"
+
+    assert painel._normalizar(antes) != painel._normalizar(agora)
+
+
+@given(
+    comuns=st.lists(
+        st.text(alphabet="0123456789.", min_size=7, max_size=15), min_size=1, max_size=3
+    ),
+    extras_antes=st.lists(st.text(alphabet="0123456789.", min_size=7, max_size=15), max_size=3),
+    extras_agora=st.lists(st.text(alphabet="0123456789.", min_size=7, max_size=15), max_size=3),
+)
+def test_rodizio_de_balanceador_nao_e_migracao(comuns, extras_antes, extras_agora):
+    """Enquanto sobrar um endereço em comum, o host não se mudou.
+
+    Domínio grande devolve um subconjunto rotativo dos seus IPs a cada consulta.
+    Comparar as listas cruas acusaria migração em toda coleta.
+    """
+    antes = comuns + extras_antes
+    agora = comuns + extras_agora
+
+    assert painel._mudanca_de_endereco(antes, agora) is False
+
+
+def test_troca_completa_de_endereco_e_reportada():
+    """E quando nenhum endereço de antes responde, aí é migração de verdade."""
+    assert painel._mudanca_de_endereco(["1.1.1.1", "1.1.1.2"], ["9.9.9.9"]) is True
+    assert painel._mudanca_de_endereco([], ["9.9.9.9"]) is True
+    assert painel._mudanca_de_endereco(["1.1.1.1"], []) is True
+    assert painel._mudanca_de_endereco([], []) is False
+
+
+def test_troca_de_ip_so_vira_diario_em_alvo_proprio():
+    """Anycast respira; o DNS do Paulo não deveria.
+
+    A mesma troca de endereço é ruído num alvo de referência e alerta num alvo
+    próprio. O dado fica gravado nos dois casos — o que muda é o que é narrado.
+    """
+
+    def observacao(classe, ips):
+        return {
+            "alvo": "x",
+            "classe": classe,
+            "sondas": [
+                {
+                    "sonda": "dns",
+                    "status": "ok",
+                    "a": ips,
+                    "aaaa": [],
+                    "mx": [],
+                    "caa": [],
+                    "spf": None,
+                    "dmarc": None,
+                }
+            ],
+        }
+
+    antes_ips, agora_ips = ["1.1.1.1"], ["9.9.9.9"]
+
+    referencia = painel.comparar(
+        observacao("referencia", antes_ips), observacao("referencia", agora_ips)
+    )
+    proprio = painel.comparar(observacao("proprio", antes_ips), observacao("proprio", agora_ips))
+
+    assert referencia == []
+    assert any("registro A trocou" in m for m in proprio)
+
+
+def test_perda_de_visibilidade_nao_vira_mudanca_do_alvo():
+    """Sonda que parou de concluir diz respeito a nós, não ao alvo.
+
+    Registrar "o alvo parou de enviar HSTS" quando na verdade a coleta deu
+    timeout seria inventar um fato sobre um sistema de terceiro.
+    """
+
+    def com_status(status, **extra):
+        sonda = {"sonda": "cabecalhos", "status": status, **extra}
+        if status == "inconclusivo":
+            sonda["motivo"] = "TimeoutError: estourou"
+        return {"alvo": "x", "classe": "referencia", "sondas": [sonda]}
+
+    antes = com_status(
+        "ok",
+        cabecalhos={"strict-transport-security": "max-age=31536000"},
+        cookies=[],
+        hsts=None,
+        csp=None,
+        csp_meta=None,
+    )
+    agora = com_status("inconclusivo")
+
+    mudancas = painel.comparar(antes, agora)
+
+    assert any("visibilidade" in m for m in mudancas)
+    assert not any("parou de enviar" in m for m in mudancas)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ Duas saídas, com propósitos diferentes:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +50,43 @@ def _ok(observacao: dict[str, Any], nome: str) -> dict[str, Any] | None:
 # --------------------------------------------------------------------------
 # comparação
 # --------------------------------------------------------------------------
+
+
+# Trechos que mudam a cada requisição sem que nada tenha mudado no alvo. Sem
+# neutralizá-los, o diário acusaria "a CSP mudou" duas vezes por dia para
+# sempre — e um diário que grita todo dia é um diário que ninguém lê. É a mesma
+# disciplina de falso-positivo que a suíte aplica em detector: o que dispara
+# sempre não informa nada.
+_RUIDO = (
+    # nonce de CSP: rotaciona por resposta, é assim que ele funciona
+    (re.compile(r"'nonce-[A-Za-z0-9+/=_-]+'"), "'nonce-…'"),
+    # hash de subrecurso e report-uri com identificador de sessão
+    (re.compile(r"'sha(256|384|512)-[A-Za-z0-9+/=]+'"), "'sha…'"),
+    (re.compile(r"\breport-uri\s+\S+"), "report-uri …"),
+)
+
+
+def _normalizar(valor: str) -> str:
+    """Apaga o que muda por requisição, preserva o que muda por decisão."""
+    for padrao, marca in _RUIDO:
+        valor = padrao.sub(marca, valor)
+    return valor
+
+
+def _mudanca_de_endereco(antes: list[str] | None, agora: list[str] | None) -> bool:
+    """Houve migração, ou é só o balanceamento devolvendo outro IP?
+
+    Um domínio grande devolve um subconjunto rotativo dos seus endereços a cada
+    consulta. Comparar as listas cruas acusaria mudança em toda coleta. O sinal
+    que interessa é **zero interseção**: quando nenhum endereço de antes
+    aparece agora, o host de fato se mudou.
+    """
+    antes_c, agora_c = set(antes or []), set(agora or [])
+    if antes_c == agora_c:
+        return False
+    if not antes_c or not agora_c:
+        return True
+    return not (antes_c & agora_c)
 
 
 def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
@@ -90,7 +128,8 @@ def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
         for nome in sorted(set(antigos) - set(novos)):
             mudancas.append(f"**parou de enviar `{nome}`**")
         for nome in sorted(set(antigos) & set(novos)):
-            if antigos[nome] != novos[nome]:
+            antes_n, agora_n = _normalizar(antigos[nome]), _normalizar(novos[nome])
+            if antes_n != agora_n:
                 mudancas.append(
                     f"`{nome}` mudou de valor\n"
                     f"  - antes: `{antigos[nome][:180]}`\n"
@@ -125,7 +164,27 @@ def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
 
     a_dns, b_dns = _ok(antes, "dns"), _ok(agora, "dns")
     if a_dns and b_dns:
-        for campo, rotulo in (("a", "A"), ("aaaa", "AAAA"), ("mx", "MX"), ("caa", "CAA")):
+        # Endereço só vira entrada de diário em alvo próprio.
+        #
+        # Num domínio grande atrás de anycast/CDN, o conjunto de IPs devolvido
+        # troca por completo entre duas consultas sem que ninguém tenha mexido
+        # em nada — é a infraestrutura respirando. Reportar isso encheria o
+        # diário de evento que o leitor não pode agir sobre.
+        #
+        # Em alvo próprio é o oposto: o Paulo controla o DNS, e o endereço
+        # mudar sem ele saber é exatamente o que um observatório existe para
+        # avisar. O dado continua gravado na série para os dois casos; o que
+        # muda é o que merece ser narrado.
+        if agora.get("classe") == "proprio":
+            for campo, rotulo in (("a", "A"), ("aaaa", "AAAA")):
+                if _mudanca_de_endereco(a_dns.get(campo), b_dns.get(campo)):
+                    mudancas.append(
+                        f"**registro {rotulo} trocou por completo** — nenhum endereço de "
+                        f"antes responde agora: `{a_dns.get(campo)}` → `{b_dns.get(campo)}`"
+                    )
+
+        # MX e CAA não rotacionam: mudança aqui é decisão de configuração.
+        for campo, rotulo in (("mx", "MX"), ("caa", "CAA")):
             if sorted(a_dns.get(campo) or []) != sorted(b_dns.get(campo) or []):
                 mudancas.append(
                     f"registro {rotulo} mudou: `{a_dns.get(campo)}` → `{b_dns.get(campo)}`"
