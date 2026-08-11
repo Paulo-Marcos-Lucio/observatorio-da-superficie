@@ -9,15 +9,15 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-08-11T22:26:19+00:00 · **23/36 sondas conclusivas** · **1 coletas** na série
+**Última coleta:** 2026-08-11T22:33:59+00:00 · **24/36 sondas conclusivas** · **2 coletas** na série
 
 ## Postura observada
 
 | Alvo | Classe | Nota | HSTS | CSP | Enquadr. | nosniff | Referrer | security.txt | Cert. |
 |---|---|---|---|---|---|---|---|---|---|
 | `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 22d |
-| `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 40d |
-| `github.com` | referencia | **6.7** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 50d |
+| `www.mozilla.org` | referencia | **8.0** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 40d |
+| `github.com` | referencia | **7.7** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 50d |
 | `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 61d |
 | `www.cloudflare.com` | referencia | · | · | · | · | · | · | barrado na borda | 66d |
 | `owasp.org` | referencia | · | · | · | · | · | · | barrado na borda | 55d |
