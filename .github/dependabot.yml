@@ -1,0 +1,23 @@
+# O coletor não tem dependência de execução — só biblioteca padrão. O que
+# precisa de atualização aqui são as actions do CI e as ferramentas de
+# desenvolvimento em `requisitos-dev.txt`.
+#
+# Fixar action por SHA sem mecanismo de atualização é congelar a versão —
+# inclusive uma versão vulnerável. O Dependabot é a outra metade da prática.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      pip:
+        patterns: ["*"]

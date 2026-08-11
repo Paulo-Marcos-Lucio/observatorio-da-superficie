@@ -1,0 +1,105 @@
+name: Dependências em dia
+
+# Mescla PR de dependência que já está verde, uma vez por dia.
+#
+# Por que um job agendado em vez do automerge nativo do GitHub: o automerge
+# nativo só espera pelos *required status checks* de uma regra de proteção de
+# branch. Sem proteção configurada — que é o caso aqui — ele mescla na hora,
+# antes de qualquer teste rodar. Este job faz o contrário: só mescla o que já
+# terminou e terminou verde.
+#
+# E ele é fail-closed quanto a major: não basta "não parecer major", precisa
+# ser *provadamente* não-major. Se a classificação não sair do diff com
+# certeza, o PR fica para revisão humana. A primeira versão deste job
+# classificava pelo título, e um PR agrupado ("Bump the pip group with 2
+# updates") não tem versão no título — um major passaria batido.
+
+on:
+  schedule:
+    - cron: "13 12 * * *"   # 09:13 em São Paulo
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependencias-em-dia
+  cancel-in-progress: false
+
+jobs:
+  mesclar-o-que-esta-verde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: O classificador está correto?
+        # Antes de deixar um script decidir merge sozinho, ele prova que ainda
+        # classifica certo. Se este passo falha, o job inteiro falha e nada é
+        # mesclado — fail-closed também quanto à própria ferramenta.
+        run: python3 .github/scripts/test_classificar_bump.py
+
+      - name: Avaliar e mesclar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          NUMEROS=$(gh pr list -R "$REPO" --state open --author "app/dependabot" \
+                      --json number --jq '.[].number')
+
+          if [ -z "$NUMEROS" ]; then
+            echo "nenhum PR de dependência aberto"
+            exit 0
+          fi
+
+          for NUMERO in $NUMEROS; do
+            echo "::group::PR #${NUMERO}"
+
+            SHA=$(gh pr view "$NUMERO" -R "$REPO" --json headRefOid --jq .headRefOid)
+
+            # --- 1. os checks terminaram? ---
+            PENDENTES=$(gh api "repos/${REPO}/commits/${SHA}/check-runs" \
+                          --jq '[.check_runs[] | select(.status!="completed")] | length')
+            if [ "$PENDENTES" != "0" ]; then
+              echo "ainda há ${PENDENTES} check(s) rodando — fica para amanhã"
+              echo "::endgroup::"
+              continue
+            fi
+
+            ESTADOS=$(gh api "repos/${REPO}/commits/${SHA}/check-runs" \
+                        --jq '[.check_runs[] | .conclusion] | join(" ")')
+            if [ -z "$ESTADOS" ]; then
+              echo "nenhum check registrado — não mescla no escuro"
+              echo "::endgroup::"
+              continue
+            fi
+
+            VERDE=1
+            for E in $ESTADOS; do
+              case "$E" in
+                success|neutral|skipped) ;;
+                *) echo "check com conclusão '${E}'"; VERDE=0 ;;
+              esac
+            done
+            if [ "$VERDE" = "0" ]; then
+              echo "há check vermelho — não mescla"
+              echo "::endgroup::"
+              continue
+            fi
+
+            # --- 2. dá para PROVAR que não é major? ---
+            gh pr diff "$NUMERO" -R "$REPO" > /tmp/pr.diff || true
+
+            if python3 .github/scripts/classificar_bump.py /tmp/pr.diff; then
+              echo "não-major comprovado e checks verdes; mesclando"
+              gh pr merge "$NUMERO" -R "$REPO" --squash --delete-branch
+            else
+              echo "não foi possível provar que é não-major — fica para revisão humana"
+            fi
+
+            echo "::endgroup::"
+          done
