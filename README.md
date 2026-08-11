@@ -9,15 +9,15 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-08-11T22:33:59+00:00 · **24/36 sondas conclusivas** · **2 coletas** na série
+**Última coleta:** 2026-08-11T23:21:28+00:00 · **24/36 sondas conclusivas** · **3 coletas** na série
 
 ## Postura observada
 
 | Alvo | Classe | Nota | HSTS | CSP | Enquadr. | nosniff | Referrer | security.txt | Cert. |
 |---|---|---|---|---|---|---|---|---|---|
 | `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 22d |
-| `www.mozilla.org` | referencia | **8.0** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 40d |
 | `github.com` | referencia | **7.7** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 50d |
+| `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 40d |
 | `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 61d |
 | `www.cloudflare.com` | referencia | · | · | · | · | · | · | barrado na borda | 66d |
 | `owasp.org` | referencia | · | · | · | · | · | · | barrado na borda | 55d |
@@ -37,6 +37,12 @@ barrando nada.
 - `+1.5` HSTS com max-age >= 180 dias
 - `+1.4` CSP em <meta> (crédito parcial)
 - `+1.0` :80 sobe para HTTPS
+
+## Diário de mudanças
+
+Dias em que a superfície observada mudou:
+
+- [2026-08-11](diario/2026-08-11.md)
 
 ## Como isto funciona
 
