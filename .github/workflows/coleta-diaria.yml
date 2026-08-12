@@ -1,14 +1,28 @@
 name: Coleta
 
-# Duas coletas por dia. Uma medição diária isolada mostra estado; duas mostram
-# que a série é contínua e pegam mudança feita durante o expediente.
+# Seis coletas por dia, de quatro em quatro horas.
+#
+# A resolução temporal é o produto aqui. Uma amostra a cada doze horas não
+# distingue "o cabeçalho sumiu" de "o cabeçalho sumiu e voltou" — e é
+# exatamente nessa janela que mora o deploy revertido às pressas, que é o
+# evento mais interessante que um observatório de superfície pode pegar. Com
+# quatro horas, uma janela de manutenção típica aparece na série em vez de
+# passar entre duas medições.
+#
+# Custo para o alvo: 4 requisições HTTP por coleta, 24 por dia. Um serviço de
+# monitoramento comum bate a cada cinco minutos (288/dia); carregar a página
+# inicial uma vez num navegador dispara mais requisições do que isto.
 #
 # Os minutos são propositalmente quebrados: agendamento no minuto :00 é o
 # horário em que o mundo inteiro agenda, e a fila do GitHub atrasa mais ali.
 on:
   schedule:
-    - cron: "23 10 * * *"   # 07:23 em São Paulo
-    - cron: "41 22 * * *"   # 19:41 em São Paulo
+    - cron: "23 2 * * *"    # 23:23 em São Paulo
+    - cron: "17 6 * * *"    # 03:17
+    - cron: "41 10 * * *"   # 07:41
+    - cron: "09 14 * * *"   # 11:09
+    - cron: "37 18 * * *"   # 15:37
+    - cron: "53 22 * * *"   # 19:53
   workflow_dispatch:
     inputs:
       host:

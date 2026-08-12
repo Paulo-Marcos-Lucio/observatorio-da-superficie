@@ -7,7 +7,7 @@ O que segue é o limite.
 
 ## O que é coletado
 
-Por alvo, uma vez a cada doze horas:
+Por alvo, uma vez a cada quatro horas:
 
 | Sonda | O que faz | Natureza |
 |---|---|---|
@@ -18,8 +18,15 @@ Por alvo, uma vez a cada doze horas:
 | `dns` | consulta DNS por DoH ao resolvedor da Cloudflare | não toca no alvo |
 | `transparencia_certificados` | consulta ao crt.sh | não toca no alvo |
 
-Total: **quatro requisições HTTP por alvo, duas vezes ao dia.** Um navegador
-carregando a página inicial uma única vez faz mais requisições do que isso.
+Total: **quatro requisições HTTP por alvo por coleta, seis coletas ao dia — 24
+requisições diárias.** Um navegador carregando a página inicial uma única vez
+dispara mais requisições do que isso; um serviço de monitoramento comum bate a
+cada cinco minutos, o que dá 288 por dia.
+
+A resolução de quatro horas existe porque é ela que distingue "o cabeçalho
+sumiu" de "o cabeçalho sumiu e voltou". Uma amostra a cada doze horas passa por
+cima de uma janela de manutenção inteira — e o deploy revertido às pressas é o
+evento mais informativo que este observatório pode registrar.
 
 ## O que nunca é coletado
 

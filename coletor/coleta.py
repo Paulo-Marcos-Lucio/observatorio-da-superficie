@@ -39,7 +39,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 AGENTE = (
     "ObservatorioDaSuperficie/1.0 "
     "(+https://github.com/Paulo-Marcos-Lucio/observatorio-da-superficie; "
-    "coleta passiva de cabeçalhos públicos; 2 requisições/dia)"
+    "coleta passiva de cabeçalhos públicos; 4 requisições a cada 4h)"
 )
 
 TEMPO_LIMITE = 15
