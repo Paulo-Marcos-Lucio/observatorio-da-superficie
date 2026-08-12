@@ -9,7 +9,7 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-08-12T01:40:46+00:00 · **24/36 sondas conclusivas** · **3 coletas** na série
+**Última coleta:** 2026-08-12T01:40:46+00:00 · **24/36 sondas conclusivas** · **4 coletas** na série
 
 ## Postura observada
 
@@ -37,6 +37,13 @@ barrando nada.
 - `+1.5` HSTS com max-age >= 180 dias
 - `+1.4` CSP em <meta> (crédito parcial)
 - `+1.0` :80 sobe para HTTPS
+
+## Diário de mudanças
+
+Dias em que a superfície observada mudou:
+
+- [2026-08-12](diario/2026-08-12.md)
+- [2026-08-11](diario/2026-08-11.md)
 
 ## Como isto funciona
 
