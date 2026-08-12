@@ -236,9 +236,14 @@ def linha_da_tabela(observacao: dict[str, Any]) -> str:
             "barrado na borda" if "borda de proteção" in sonda.get("motivo", "") else "inconclusivo"
         )
         cert = f"{tls['dias_para_expirar']}d" if tls else "·"
+        # O motivo explica a NOTA, então ele vai na coluna da nota. Na primeira
+        # versão ele caía na nona célula — a de `security.txt` — e o README
+        # publicado dizia "security.txt: barrado na borda" quando o que fora
+        # barrado era a raiz. E o resultado real da sonda de security.txt, que
+        # pode ter sido conclusivo, era jogado fora.
         return (
-            f"| `{observacao['alvo']}` | {observacao['classe']} | · | "
-            f"· | · | · | · | · | {nota_rodape} | {cert} |"
+            f"| `{observacao['alvo']}` | {observacao['classe']} | {nota_rodape} | "
+            f"· | · | · | · | · | {_marca_security_txt(stxt)} | {cert} |"
         )
 
     presentes = cab["cabecalhos"]

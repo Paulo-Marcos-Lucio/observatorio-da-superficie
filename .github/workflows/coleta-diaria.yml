@@ -36,15 +36,34 @@ jobs:
           python-version: "3.12"
 
       - name: Coletar
+        # O input vai por ambiente, nunca por interpolação dentro do `run:`.
+        # `${{ inputs.host }}` é substituído como TEXTO pelo runner antes de o
+        # bash existir: um host como `x"; curl … | sh; #` viraria comando. É a
+        # classe de injeção que o hardening guide do GitHub descreve, e num
+        # job com `contents: write` ela entrega o token de escrita do repo.
+        env:
+          HOST: ${{ inputs.host }}
         run: |
-          if [ -n "${{ inputs.host }}" ]; then
-            python coletor/coleta.py --host "${{ inputs.host }}"
+          if [ -n "${HOST:-}" ]; then
+            python coletor/coleta.py --host "$HOST"
           else
             python coletor/coleta.py
           fi
 
       - name: Gerar painel e diário
-        run: python coletor/painel.py
+        # A coleta parcial (--host) grava um instantâneo com um alvo só. Se ela
+        # alimentasse o painel, o README público perderia os outros cinco
+        # alvos e o diário registraria "alvo saiu da lista" cinco vezes, num
+        # arquivo que é permanente. Coleta parcial serve para depurar, não
+        # para publicar.
+        env:
+          HOST: ${{ inputs.host }}
+        run: |
+          if [ -n "${HOST:-}" ]; then
+            echo "::notice::coleta parcial de '${HOST}' — painel e diário não são regenerados"
+          else
+            python coletor/painel.py
+          fi
 
       - name: Registrar
         run: |

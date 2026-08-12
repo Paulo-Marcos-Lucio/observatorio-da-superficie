@@ -504,5 +504,187 @@ def test_perda_de_visibilidade_nao_vira_mudanca_do_alvo():
     assert not any("parou de enviar" in m for m in mudancas)
 
 
+# --------------------------------------------------------------------------
+# 9. Regressões achadas pela passagem adversarial de 2026-08-11
+# --------------------------------------------------------------------------
+
+
+@given(
+    codigo=st.sampled_from([200, 201, 403, 503]),
+    assinatura=st.sampled_from(["cf-mitigated", "x-iinfo"]),
+)
+def test_bloqueio_com_assinatura_forte_e_pego_em_qualquer_codigo(codigo, assinatura):
+    """Nem todo bloqueio vem com código de recusa.
+
+    A Imperva devolve "Request unsuccessful. Incapsula incident ID" com HTTP
+    **200**. A primeira versão saía com `return None` antes de olhar qualquer
+    cabeçalho quando o código não era 4xx/5xx — e a página do WAF virava nota.
+    """
+    bloqueio = coleta._bloqueio_de_borda(codigo, {assinatura: ["x"]}, b"")
+    assert bloqueio is not None, f"{codigo} + {assinatura} passou batido"
+
+
+def test_texto_de_pagina_de_bloqueio_e_pego_em_200():
+    corpo = b"<html><title>Just a moment...</title>Checking your browser</html>"
+    assert coleta._bloqueio_de_borda(200, {"server": ["cloudflare"]}, corpo) is not None
+
+    corpo_imperva = b"Request unsuccessful. Incapsula incident ID: 1234-567"
+    assert coleta._bloqueio_de_borda(200, {}, corpo_imperva) is not None
+
+
+@given(codigo=st.sampled_from([200, 301, 404]))
+def test_cdn_saudavel_nao_vira_bloqueio(codigo):
+    """O dual: `cf-ray` e `server: cloudflare` aparecem em resposta saudável.
+
+    Tratá-los como bloqueio transformaria metade da web em inconclusivo.
+    """
+    assert (
+        coleta._bloqueio_de_borda(codigo, {"server": ["cloudflare"], "cf-ray": ["8a"]}, b"") is None
+    )
+
+
+def test_hsts_max_age_zero_nao_pontua():
+    """`max-age=0` manda o navegador APAGAR a política. É HSTS desligado."""
+    lido = coleta._ler_hsts("max-age=0; includeSubDomains")
+    assert lido["desligado"] is True
+
+    observacao = {
+        "alvo": "x",
+        "classe": "proprio",
+        "sondas": [
+            {
+                "sonda": "cabecalhos",
+                "status": "ok",
+                "cabecalhos": {"strict-transport-security": "max-age=0; includeSubDomains"},
+                "cookies": [],
+                "hsts": lido,
+                "csp": None,
+                "csp_meta": None,
+            }
+        ],
+    }
+    postura = coleta.nota_de_postura(observacao)
+
+    assert not any("HSTS" in r for r, _ in postura["ganhos"])
+    assert any("max-age=0" in r for r, _ in postura["perdas"])
+    assert postura["nota"] == 0.0
+
+
+def test_hsts_sem_max_age_e_invalido_e_nao_curto():
+    lido = coleta._ler_hsts("includeSubDomains; preload")
+    assert lido["valido"] is False
+    assert lido["max_age_segundos"] is None
+
+
+@given(valor=st.sampled_from(["ALLOWALL", "ALLOW-FROM https://x.test", "", "invalido"]))
+def test_x_frame_options_com_valor_ignorado_nao_pontua(valor):
+    """`ALLOWALL` existe para PERMITIR enquadramento; `ALLOW-FROM` nenhum
+    navegador moderno suporta. Creditar por presença mede a intenção de quem
+    configurou, não o efeito no navegador."""
+    cabecalhos = {"x-frame-options": valor} if valor else {}
+    observacao = {
+        "alvo": "x",
+        "classe": "proprio",
+        "sondas": [
+            {
+                "sonda": "cabecalhos",
+                "status": "ok",
+                "cabecalhos": cabecalhos,
+                "cookies": [],
+                "hsts": None,
+                "csp": None,
+                "csp_meta": None,
+            }
+        ],
+    }
+    postura = coleta.nota_de_postura(observacao)
+    assert not any("Enquadramento" in r for r, _ in postura["ganhos"])
+
+
+@given(valor=st.sampled_from(["DENY", "SAMEORIGIN", "deny", " sameorigin "]))
+def test_x_frame_options_valido_pontua(valor):
+    observacao = {
+        "alvo": "x",
+        "classe": "proprio",
+        "sondas": [
+            {
+                "sonda": "cabecalhos",
+                "status": "ok",
+                "cabecalhos": {"x-frame-options": valor},
+                "cookies": [],
+                "hsts": None,
+                "csp": None,
+                "csp_meta": None,
+            }
+        ],
+    }
+    postura = coleta.nota_de_postura(observacao)
+    assert any("Enquadramento" in r for r, _ in postura["ganhos"])
+
+
+def test_referrer_policy_permissiva_nao_vale_o_mesmo_que_restritiva():
+    def nota(valor):
+        return coleta.nota_de_postura(
+            {
+                "alvo": "x",
+                "classe": "proprio",
+                "sondas": [
+                    {
+                        "sonda": "cabecalhos",
+                        "status": "ok",
+                        "cabecalhos": {"referrer-policy": valor},
+                        "cookies": [],
+                        "hsts": None,
+                        "csp": None,
+                        "csp_meta": None,
+                    }
+                ],
+            }
+        )["nota"]
+
+    assert nota("no-referrer") > nota("unsafe-url")
+    assert nota("strict-origin-when-cross-origin") > nota("no-referrer-when-downgrade")
+
+
+def test_csp_repetida_nao_e_concatenada_com_separador_inventado():
+    """O navegador aplica todas as políticas; ele não as cola com ' | '.
+
+    Concatenar gruda a última diretiva de uma na primeira da outra e produz uma
+    política que não existe em lugar nenhum.
+    """
+    lida = coleta._ler_csp_multipla(
+        ["default-src 'self'", "frame-ancestors 'none'; script-src 'unsafe-inline'"]
+    )
+    assert lida["n_politicas"] == 2
+    assert lida["tem_default_src"] is True
+    assert lida["tem_frame_ancestors"] is True
+    assert lida["usa_unsafe_inline"] is True
+
+
+def test_linha_da_tabela_tem_sempre_o_mesmo_numero_de_colunas():
+    """O ramo de fallback punha o motivo na 9ª célula — a de `security.txt` —
+    e o README publicado dizia "security.txt: barrado na borda" quando o que
+    fora barrado era a raiz."""
+
+    def observacao(status):
+        sondas = [{"sonda": "cabecalhos", "status": status}]
+        if status == "ok":
+            sondas[0].update(
+                {"cabecalhos": {}, "cookies": [], "hsts": None, "csp": None, "csp_meta": None}
+            )
+        else:
+            sondas[0]["motivo"] = "resposta veio de uma borda de proteção: HTTP 403"
+        obs = {"alvo": "x", "classe": "referencia", "sondas": sondas}
+        obs["postura"] = coleta.nota_de_postura(obs)
+        return obs
+
+    com = painel.linha_da_tabela(observacao("ok"))
+    sem = painel.linha_da_tabela(observacao("inconclusivo"))
+
+    assert com.count("|") == sem.count("|")
+    # o motivo explica a nota, então mora na coluna da nota (3ª célula)
+    assert sem.split("|")[3].strip() == "barrado na borda"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

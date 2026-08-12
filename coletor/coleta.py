@@ -161,13 +161,20 @@ def sonda(nome: str):
 # não reconhece. Ver `_bloqueio_de_borda`.
 CODIGOS_DE_BORDA = {401, 403, 405, 406, 409, 429, 451, 503}
 
-_ASSINATURAS_DE_BORDA = (
+# Cabeçalhos que qualquer CDN saudável emite. Servem para enriquecer o motivo
+# quando o código já indica recusa — nunca, sozinhos, para declarar bloqueio.
+_ASSINATURAS_FRACAS = (
     "cf-ray",
-    "cf-mitigated",
     "x-akamai-transformed",
     "x-sucuri-id",
+)
+
+# Cabeçalhos que só aparecem quando a borda decidiu barrar. `cf-mitigated` é
+# emitido pela Cloudflare exatamente ao aplicar desafio; `x-iinfo` é o carimbo
+# da página de incidente da Imperva.
+_ASSINATURAS_FORTES = (
+    "cf-mitigated",
     "x-iinfo",
-    "server-timing",
 )
 
 _TEXTOS_DE_BORDA = (
@@ -177,6 +184,9 @@ _TEXTOS_DE_BORDA = (
     "request blocked",
     "verifying you are human",
     "checking your browser",
+    "enable javascript and cookies",
+    "incapsula incident",
+    "the requested url was rejected",
     "acesso negado",
 )
 
@@ -195,27 +205,41 @@ def _bloqueio_de_borda(
 
     Um 403 na raiz de um site que existe para servir uma página inicial não é
     postura, é recusa. O tratamento correto é `inconclusivo`, não nota ruim.
+
+    **Nem todo bloqueio vem com código de recusa.** A primeira versão desta
+    função saía com ``return None`` antes de olhar qualquer coisa quando o
+    código não era 4xx/5xx — e por essa porta passava justamente a forma mais
+    comum de bloqueio moderno: a Imperva devolve a página "Request
+    unsuccessful. Incapsula incident ID" com **HTTP 200**, e o F5 ASM faz o
+    mesmo com "The requested URL was rejected". A decisão agora é por
+    evidência, não por código.
     """
-    if codigo not in CODIGOS_DE_BORDA:
+    texto = corpo[:8192].decode("utf-8", "replace").lower()
+    servidor = " ".join(cabecalhos.get("server", [])).lower()
+
+    fortes = [a for a in _ASSINATURAS_FORTES if a in cabecalhos]
+    textos = [m for m in _TEXTOS_DE_BORDA if m in texto]
+
+    # Um 200 só é declarado bloqueio com evidência de alta especificidade: um
+    # cabeçalho que a borda só emite ao barrar, OU o texto da própria página de
+    # bloqueio. `cf-ray` e `server: cloudflare` não bastam — eles aparecem em
+    # milhões de respostas saudáveis, e usá-los aqui transformaria metade da
+    # web em "inconclusivo".
+    if codigo not in CODIGOS_DE_BORDA and not fortes and not textos:
         return None
 
     indicios = [f"HTTP {codigo} na raiz"]
 
-    servidor = " ".join(cabecalhos.get("server", [])).lower()
     for nome in ("cloudflare", "akamai", "sucuri", "imperva", "incapsula", "awselb"):
         if nome in servidor:
             indicios.append(f"Server: {servidor}")
             break
 
-    for assinatura in _ASSINATURAS_DE_BORDA:
-        if assinatura in cabecalhos:
-            indicios.append(f"cabeçalho `{assinatura}` presente")
+    for assinatura in fortes + [a for a in _ASSINATURAS_FRACAS if a in cabecalhos]:
+        indicios.append(f"cabeçalho `{assinatura}` presente")
 
-    texto = corpo[:8192].decode("utf-8", "replace").lower()
-    for marca in _TEXTOS_DE_BORDA:
-        if marca in texto:
-            indicios.append(f"corpo contém {marca!r}")
-            break
+    if textos:
+        indicios.append(f"corpo contém {textos[0]!r}")
 
     return {"bloqueado": True, "indicios": indicios}
 
@@ -255,21 +279,41 @@ def sondar_cabecalhos(alvo: str) -> dict[str, Any]:
             + " — os cabeçalhos desta resposta são do WAF e não descrevem o alvo"
         )
 
+    # Dois valores por cabeçalho, e a distinção não é cosmética: o corte em 600
+    # existe para o painel não virar uma parede de texto, mas ANALISAR o valor
+    # cortado é publicar coisa falsa. A CSP da Mozilla tem mais de 600
+    # caracteres, e nas duas primeiras coletas deste repositório ela foi lida
+    # como se acabasse no corte — numa `tem_frame_ancestors=True`, na outra
+    # `False`, só porque a diretiva caiu de lado diferente da tesoura.
     presentes: dict[str, str] = {}
+    integros: dict[str, list[str]] = {}
     for nome in CABECALHOS:
         if nome in cabecalhos:
+            integros[nome] = cabecalhos[nome]
             presentes[nome] = " | ".join(cabecalhos[nome])[:600]
 
     csp_meta = _ler_csp_meta(corpo)
 
     return {
+        "truncado_para_exibicao": sorted(
+            n for n, v in integros.items() if len(" | ".join(v)) > 600
+        ),
         "codigo": codigo,
         "cabecalhos": presentes,
         "cookies": _ler_cookies(cabecalhos.get("set-cookie", [])),
-        "hsts": _ler_hsts(presentes.get("strict-transport-security")),
-        "csp": _ler_csp(presentes.get("content-security-policy")),
+        # A análise sempre come o valor íntegro, nunca o cortado.
+        "hsts": _ler_hsts(_primeiro(integros.get("strict-transport-security"))),
+        "csp": _ler_csp_multipla(integros.get("content-security-policy")),
         "csp_meta": csp_meta,
     }
+
+
+def _primeiro(valores: list[str] | None) -> str | None:
+    """O primeiro valor de um cabeçalho repetido.
+
+    Para HSTS é o que o navegador faz: cabeçalho duplicado, vale o primeiro.
+    """
+    return valores[0] if valores else None
 
 
 # Diretivas que o navegador IGNORA quando a CSP chega por `<meta http-equiv>`
@@ -350,16 +394,82 @@ def _ler_cookies(brutos: list[str]) -> list[dict[str, Any]]:
 
 
 def _ler_hsts(valor: str | None) -> dict[str, Any] | None:
+    """Lê o HSTS distinguindo três estados que não podem virar um só.
+
+    * **sem `max-age`** — o cabeçalho é inválido e o navegador o descarta
+      inteiro. Não é HSTS curto, é HSTS nenhum.
+    * **`max-age=0`** — é a instrução explícita para o navegador **apagar** a
+      política já armazenada. É o que um site emite ao fazer rollback de HSTS.
+      Tratar isso como "HSTS presente, só que curto" e dar crédito parcial é
+      pontuar a ausência de uma proteção pela existência do texto que a remove.
+    * **`max-age>0`** — HSTS de verdade.
+    """
     if not valor:
         return None
-    idade = re.search(r"max-age\s*=\s*(\d+)", valor, re.I)
-    segundos = int(idade.group(1)) if idade else 0
+
+    idade = re.search(r"max-age\s*=\s*\"?(\d+)\"?", valor, re.I)
+    if idade is None:
+        return {
+            "max_age_segundos": None,
+            "max_age_dias": None,
+            "valido": False,
+            "desligado": False,
+            "include_subdomains": False,
+            "preload": False,
+            "motivo": "cabeçalho sem max-age — o navegador descarta a política inteira",
+        }
+
+    segundos = int(idade.group(1))
     return {
         "max_age_segundos": segundos,
         "max_age_dias": round(segundos / 86400, 1),
+        "valido": True,
+        "desligado": segundos == 0,
         "include_subdomains": "includesubdomains" in valor.lower(),
         "preload": "preload" in valor.lower(),
+        **(
+            {"motivo": "max-age=0 manda o navegador APAGAR a política — HSTS desligado"}
+            if segundos == 0
+            else {}
+        ),
     }
+
+
+def _ler_csp_multipla(valores: list[str] | None) -> dict[str, Any] | None:
+    """Lê CSP quando o cabeçalho aparece mais de uma vez.
+
+    O navegador aplica **todas** as políticas: um recurso precisa ser permitido
+    por cada uma delas, o que na prática é a interseção do que é liberado. Ler
+    as políticas concatenadas com um separador inventado (`" | "`) cola a
+    última diretiva de uma na primeira da outra e produz uma política que não
+    existe em lugar nenhum.
+    """
+    if not valores:
+        return None
+
+    lidas = [p for p in (_ler_csp(v) for v in valores) if p]
+    if not lidas:
+        return None
+    if len(lidas) == 1:
+        return lidas[0]
+
+    combinada = {
+        "n_politicas": len(lidas),
+        "n_diretivas": sum(p["n_diretivas"] for p in lidas),
+    }
+    # Uma restrição vale se QUALQUER política a impõe (todas são aplicadas).
+    for campo in (
+        "tem_default_src",
+        "tem_frame_ancestors",
+        "tem_object_src",
+        "usa_nonce",
+        "usa_strict_dynamic",
+    ):
+        combinada[campo] = any(p[campo] for p in lidas)
+    # Uma frouxidão conta se QUALQUER política a contém.
+    for campo in ("usa_unsafe_inline", "usa_unsafe_eval"):
+        combinada[campo] = any(p[campo] for p in lidas)
+    return combinada
 
 
 def _ler_csp(valor: str | None) -> dict[str, Any] | None:
@@ -452,28 +562,69 @@ def sondar_security_txt(alvo: str) -> dict[str, Any]:
     }
 
 
+# RCODEs de DNS, para que o motivo do inconclusivo diga o que houve.
+_RCODE = {
+    0: "NOERROR",
+    1: "FORMERR",
+    2: "SERVFAIL",
+    3: "NXDOMAIN",
+    4: "NOTIMP",
+    5: "REFUSED",
+}
+
+
 @sonda("dns")
 def sondar_dns(alvo: str) -> dict[str, Any]:
     """DNS por DoH (Cloudflare). Registro público, consulta passiva."""
     raiz = ".".join(alvo.split(".")[-2:]) if alvo.count(".") >= 1 else alvo
 
     def consultar(nome: str, tipo: str) -> list[str]:
+        """Consulta DoH que distingue "não há registro" de "não consegui saber".
+
+        O RCODE vem no campo ``Status`` do JSON, e o HTTP é 200 mesmo quando o
+        resolvedor falhou. Ler só ``Answer`` faz SERVFAIL e REFUSED virarem
+        lista vazia, indistinguível de ausência real — que é exatamente a
+        confusão que este projeto existe para não cometer. Aqui o erro vira
+        exceção, e o decorador ``@sonda`` a converte em `inconclusivo`.
+
+        NOERROR (0) e NXDOMAIN (3) são conclusivos: o primeiro diz "o nome
+        existe e não tem esse tipo de registro", o segundo diz "o nome não
+        existe". Nos dois casos a lista vazia é uma afirmação legítima.
+
+        O resultado sai **ordenado**: o resolvedor rotaciona a ordem do RRset a
+        cada consulta, e comparar listas na ordem de chegada faria o diário
+        publicar "o registro CAA mudou" duas vezes por dia para sempre.
+        """
         url = "https://cloudflare-dns.com/dns-query?" + urllib.parse.urlencode(
             {"name": nome, "type": tipo}
         )
-        _, _, corpo = _abrir(url, cabecalhos_extra={"accept": "application/dns-json"})
+        codigo, _, corpo = _abrir(url, cabecalhos_extra={"accept": "application/dns-json"})
+        if codigo != 200:
+            raise RuntimeError(f"resolvedor DoH respondeu HTTP {codigo} para {tipo} {nome}")
+
         resposta = json.loads(corpo)
-        return [r["data"] for r in resposta.get("Answer", []) if "data" in r]
+        estado = resposta.get("Status")
+        if estado not in (0, 3):
+            raise RuntimeError(
+                f"consulta {tipo} de {nome} voltou RCODE {estado} "
+                f"({_RCODE.get(estado, 'desconhecido')}) — não sabemos, não é ausência"
+            )
+
+        return sorted(r["data"] for r in resposta.get("Answer", []) if "data" in r)
 
     txt = consultar(raiz, "TXT")
     dmarc = consultar(f"_dmarc.{raiz}", "TXT")
 
     return {
         "dominio_raiz": raiz,
-        "a": consultar(alvo, "A")[:8],
-        "aaaa": consultar(alvo, "AAAA")[:8],
-        "mx": consultar(raiz, "MX")[:8],
-        "caa": consultar(raiz, "CAA")[:8],
+        # Sem fatiar: fatiar um conjunto sem ordem estável guarda um subconjunto
+        # diferente a cada coleta e inventa mudança que nunca houve. A mozilla.org
+        # tem 11 registros CAA, e o `[:8]` anterior já produziu uma entrada falsa
+        # de "registro CAA mudou" no diário público.
+        "a": consultar(alvo, "A"),
+        "aaaa": consultar(alvo, "AAAA"),
+        "mx": consultar(raiz, "MX"),
+        "caa": consultar(raiz, "CAA"),
         "spf": next((t for t in txt if "v=spf1" in t.lower()), None),
         "dmarc": next((t for t in dmarc if "v=dmarc1" in t.lower()), None),
         "n_txt": len(txt),
@@ -532,6 +683,23 @@ SONDAS = [
 # --------------------------------------------------------------------------
 
 
+# Valores de Referrer-Policy que de fato contêm o vazamento de URL para
+# terceiro. `unsafe-url` e `no-referrer-when-downgrade` são o oposto disso, e
+# um valor que o navegador não reconhece faz o cabeçalho inteiro ser ignorado.
+_REFERRER_RESTRITIVO = {
+    "no-referrer",
+    "same-origin",
+    "strict-origin",
+    "strict-origin-when-cross-origin",
+}
+_REFERRER_CONHECIDO = _REFERRER_RESTRITIVO | {
+    "origin",
+    "origin-when-cross-origin",
+    "no-referrer-when-downgrade",
+    "unsafe-url",
+}
+
+
 def nota_de_postura(observacao: dict[str, Any]) -> dict[str, Any]:
     """Nota 0–10 dos cabeçalhos, com o porquê de cada ponto.
 
@@ -557,12 +725,14 @@ def nota_de_postura(observacao: dict[str, Any]) -> dict[str, Any]:
 
     pontos: list[tuple[str, float]] = []
 
-    if hsts and hsts["max_age_dias"] >= 180:
+    hsts_vale = bool(hsts and hsts.get("valido") and not hsts.get("desligado"))
+
+    if hsts_vale and hsts["max_age_dias"] >= 180:
         pontos.append(("HSTS com max-age >= 180 dias", 1.5))
-    elif hsts:
+    elif hsts_vale:
         pontos.append(("HSTS presente mas com max-age curto", 0.7))
 
-    if hsts and hsts["include_subdomains"]:
+    if hsts_vale and hsts["include_subdomains"]:
         pontos.append(("HSTS cobre subdomínios", 0.5))
 
     if csp:
@@ -591,13 +761,28 @@ def nota_de_postura(observacao: dict[str, Any]) -> dict[str, Any]:
 
     if presentes.get("x-content-type-options", "").lower().startswith("nosniff"):
         pontos.append(("X-Content-Type-Options: nosniff", 1.0))
+
     # Enquadramento: só conta X-Frame-Options ou frame-ancestors NO CABEÇALHO.
     # frame-ancestors declarado em <meta> é ignorado pelo navegador e por isso
     # não pontua aqui — pontuar seria repetir o engano que o site cometeu.
-    if "x-frame-options" in presentes or (csp and csp["tem_frame_ancestors"]):
+    #
+    # E o VALOR importa. `X-Frame-Options: ALLOWALL` existe para *permitir*
+    # enquadramento, e `ALLOW-FROM` não é suportado por navegador moderno
+    # nenhum: os dois deixam o site enquadrável. Creditar por presença do nome
+    # do cabeçalho é medir a intenção de quem configurou, não o efeito.
+    xfo = presentes.get("x-frame-options", "").strip().upper()
+    xfo_vale = xfo in {"DENY", "SAMEORIGIN"}
+    if xfo_vale or (csp and csp["tem_frame_ancestors"]):
         pontos.append(("Enquadramento restrito", 1.0))
-    if "referrer-policy" in presentes:
-        pontos.append(("Referrer-Policy", 1.0))
+
+    referrer = presentes.get("referrer-policy", "").strip().lower()
+    # Vale o último token válido, que é como o navegador resolve a lista.
+    tokens_referrer = [t.strip() for t in referrer.split(",") if t.strip()]
+    ultimo = tokens_referrer[-1] if tokens_referrer else ""
+    if ultimo in _REFERRER_RESTRITIVO:
+        pontos.append(("Referrer-Policy restritiva", 1.0))
+    elif ultimo in _REFERRER_CONHECIDO:
+        pontos.append(("Referrer-Policy presente, mas permissiva", 0.3))
     if "permissions-policy" in presentes:
         pontos.append(("Permissions-Policy", 0.5))
     if "cross-origin-opener-policy" in presentes:
@@ -618,6 +803,13 @@ def nota_de_postura(observacao: dict[str, Any]) -> dict[str, Any]:
                 -0.5,
             )
         )
+
+    if hsts and hsts.get("desligado"):
+        penalidades.append(("HSTS com max-age=0 — a política está sendo apagada", -0.5))
+    if hsts and not hsts.get("valido"):
+        penalidades.append(("HSTS sem max-age — o navegador descarta o cabeçalho", -0.3))
+    if xfo and not xfo_vale:
+        penalidades.append((f"X-Frame-Options com valor que o navegador ignora ({xfo})", -0.3))
 
     if "x-powered-by" in presentes:
         penalidades.append(("X-Powered-By revela pilha", -0.3))

@@ -52,6 +52,20 @@ CASOS = [
         True,
     ),
     (
+        "item de lista YAML com major — a linha real de um workflow",
+        "-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v7.0.1\n"
+        "+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v8.0.0\n",
+        False,
+    ),
+    (
+        "grupo: item de lista com MAJOR + linha sem traço com minor",
+        "-      - uses: actions/checkout@aaaaaaa # v7.0.1\n"
+        "+      - uses: actions/checkout@bbbbbbb # v8.0.0\n"
+        "-        uses: actions/dependency-review-action@ccccccc # v5.0.0\n"
+        "+        uses: actions/dependency-review-action@ddddddd # v5.1.0\n",
+        False,
+    ),
+    (
         "pom.xml minor",
         "-    <version>3.2.5</version>\n+    <version>3.2.7</version>\n",
         True,

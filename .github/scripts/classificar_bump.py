@@ -46,8 +46,17 @@ PADROES = [
 
 
 def _extrair(linha: str) -> tuple[str, tuple[int, int]] | None:
-    """Nome e (major, minor) de uma linha de diff, se ela declarar versão."""
+    """Nome e (major, minor) de uma linha de diff, se ela declarar versão.
+
+    O marcador de item de lista YAML precisa sair antes do casamento. A linha
+    real de um workflow é ``      - uses: acao@sha # v7.0.1``; depois do
+    ``strip()`` ela começa com ``- uses:``, e um padrão ancorado em ``^uses:``
+    não casa. Pior do que não casar: a troca de versão fica *invisível* — não
+    entra nem na lista de órfãs — e bastava outra linha legível no mesmo diff
+    para o job declarar "não-major comprovado" e mesclar um major sozinho.
+    """
     corpo = linha[1:].strip()
+    corpo = re.sub(r"^-\s+", "", corpo)  # item de lista YAML
     for padrao in PADROES:
         achado = padrao.match(corpo)
         if achado:
