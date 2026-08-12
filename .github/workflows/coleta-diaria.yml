@@ -1,28 +1,31 @@
 name: Coleta
 
-# Seis coletas por dia, de quatro em quatro horas.
+# Coleta de hora em hora.
 #
 # A resolução temporal é o produto aqui. Uma amostra a cada doze horas não
 # distingue "o cabeçalho sumiu" de "o cabeçalho sumiu e voltou" — e é
 # exatamente nessa janela que mora o deploy revertido às pressas, que é o
-# evento mais interessante que um observatório de superfície pode pegar. Com
-# quatro horas, uma janela de manutenção típica aparece na série em vez de
-# passar entre duas medições.
+# evento mais informativo que um observatório de superfície pode registrar.
+# Com uma hora, uma janela de manutenção aparece na série em vez de passar
+# entre duas medições.
 #
-# Custo para o alvo: 4 requisições HTTP por coleta, 24 por dia. Um serviço de
-# monitoramento comum bate a cada cinco minutos (288/dia); carregar a página
-# inicial uma vez num navegador dispara mais requisições do que isto.
+# Custo para o alvo: 4 requisições HTTP por coleta, 96 por dia. Um serviço de
+# monitoramento comum bate a cada cinco minutos (288/dia só de HTTP); carregar
+# a página inicial uma vez num navegador dispara mais requisições do que uma
+# coleta inteira.
 #
-# Os minutos são propositalmente quebrados: agendamento no minuto :00 é o
-# horário em que o mundo inteiro agenda, e a fila do GitHub atrasa mais ali.
+# O crt.sh fica de fora da coleta horária: é serviço comunitário gratuito, e
+# certificado novo não aparece de hora em hora. Ele roda uma vez por dia, na
+# coleta marcada como completa.
+#
+# O instantâneo com os cabeçalhos inteiros só é gravado quando algo muda. A
+# série compacta registra todas as horas. Sem isso seriam 193 MB por ano de
+# histórico permanente só para dizer que nada aconteceu.
 on:
   schedule:
-    - cron: "23 2 * * *"    # 23:23 em São Paulo
-    - cron: "17 6 * * *"    # 03:17
-    - cron: "41 10 * * *"   # 07:41
-    - cron: "09 14 * * *"   # 11:09
-    - cron: "37 18 * * *"   # 15:37
-    - cron: "53 22 * * *"   # 19:53
+    # De hora em hora, no minuto 23 — longe do :00, onde o mundo inteiro agenda
+    # e a fila do GitHub atrasa mais.
+    - cron: "23 * * * *"
   workflow_dispatch:
     inputs:
       host:
@@ -58,10 +61,19 @@ jobs:
         env:
           HOST: ${{ inputs.host }}
         run: |
+          # A coleta das 03h UTC é a completa do dia: roda também o crt.sh e
+          # grava o instantâneo mesmo sem mudança, para a série ter uma linha
+          # de base diária com os cabeçalhos inteiros.
+          COMPLETA=""
+          if [ "$(date -u +%H)" = "03" ]; then
+            COMPLETA="--completa"
+            echo "::notice::coleta completa do dia (inclui Transparência de Certificados)"
+          fi
+
           if [ -n "${HOST:-}" ]; then
-            python coletor/coleta.py --host "$HOST"
+            python coletor/coleta.py --host "$HOST" $COMPLETA
           else
-            python coletor/coleta.py
+            python coletor/coleta.py $COMPLETA
           fi
 
       - name: Gerar painel e diário

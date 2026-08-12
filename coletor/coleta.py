@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import re
 import socket
@@ -39,7 +40,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 AGENTE = (
     "ObservatorioDaSuperficie/1.0 "
     "(+https://github.com/Paulo-Marcos-Lucio/observatorio-da-superficie; "
-    "coleta passiva de cabeçalhos públicos; 4 requisições a cada 4h)"
+    "coleta passiva de cabeçalhos públicos; 4 requisições por hora)"
 )
 
 TEMPO_LIMITE = 15
@@ -147,6 +148,13 @@ def sonda(nome: str):
                     "motivo": f"{type(erro).__name__}: {erro}"[:300],
                 }
 
+        # O nome da sonda fica acessível de fora do envelope. Sem isto,
+        # `funcao.__name__` vira "executar" para quem inspeciona a lista de
+        # sondas — e a sonda pulada seria registrada na série com o nome do
+        # decorador em vez do nome dela.
+        executar.sonda_nome = nome
+        executar.__name__ = funcao.__name__
+        executar.__doc__ = funcao.__doc__
         return executar
 
     return envelope
@@ -668,14 +676,35 @@ def sondar_ct(alvo: str) -> dict[str, Any]:
     }
 
 
-SONDAS = [
+# Sondas que rodam em toda coleta: falam direto com o alvo ou com um resolvedor
+# de DNS, e o custo é de quatro requisições.
+SONDAS_DE_HORA = [
     sondar_porta80,
     sondar_cabecalhos,
     sondar_tls,
     sondar_security_txt,
     sondar_dns,
+]
+
+# Sondas de uma vez por dia. O crt.sh é um serviço comunitário gratuito e
+# notoriamente sobrecarregado; consultá-lo de hora em hora para seis domínios
+# seriam 144 consultas diárias em cima de uma infraestrutura que ninguém paga.
+# Certificado novo também não aparece de hora em hora — a granularidade diária
+# não perde nada que importe.
+SONDAS_DO_DIA = [
     sondar_ct,
 ]
+
+
+def _pulada(nome: str, motivo: str) -> dict[str, Any]:
+    """Sonda que não rodou nesta coleta.
+
+    Terceiro estado, distinto de `ok` e de `inconclusivo`: não houve tentativa.
+    Chamar isso de inconclusivo seria dizer que tentamos e não soubemos, o que
+    é falso — e a doutrina da casa é justamente não colapsar estados que
+    significam coisas diferentes.
+    """
+    return {"sonda": nome, "status": "pulada", "motivo": motivo}
 
 
 # --------------------------------------------------------------------------
@@ -870,15 +899,79 @@ def ler_alvos(caminho: Path) -> list[dict[str, str]]:
 # --------------------------------------------------------------------------
 
 
-def observar(alvo: dict[str, str]) -> dict[str, Any]:
+def observar(alvo: dict[str, str], completa: bool = False) -> dict[str, Any]:
     host = alvo["host"]
+    sondas = [s(host) for s in SONDAS_DE_HORA]
+
+    if completa:
+        sondas += [s(host) for s in SONDAS_DO_DIA]
+    else:
+        sondas += [
+            _pulada(
+                s.sonda_nome,
+                "sonda diária: roda só na coleta completa, para não martelar "
+                "um serviço comunitário gratuito de hora em hora",
+            )
+            for s in SONDAS_DO_DIA
+        ]
+
     observacao: dict[str, Any] = {
         "alvo": host,
         "classe": alvo.get("classe", "referencia"),
-        "sondas": [s(host) for s in SONDAS],
+        "sondas": sondas,
     }
     observacao["postura"] = nota_de_postura(observacao)
+    observacao["impressao"] = _impressao(observacao)
     return observacao
+
+
+# Campos que mudam sozinhos entre duas coletas sem que nada tenha mudado no
+# alvo. Entram na série, mas não contam para decidir se vale guardar um
+# instantâneo novo.
+_VOLATEIS = {"dias_para_expirar", "motivo", "n_certificados_validos", "n_emitidos_7d"}
+
+
+def _impressao(observacao: dict[str, Any]) -> str:
+    """Impressão digital estável da observação.
+
+    Serve para responder "isto é igual à última vez?" sem se deixar enganar
+    por nonce de CSP que rotaciona a cada resposta nem por um contador de dias
+    até o certificado expirar, que cai sozinho todo dia.
+    """
+
+    def limpar(valor: Any) -> Any:
+        if isinstance(valor, dict):
+            return {c: limpar(v) for c, v in sorted(valor.items()) if c not in _VOLATEIS}
+        if isinstance(valor, list):
+            return [limpar(v) for v in valor]
+        if isinstance(valor, str):
+            return re.sub(r"'nonce-[A-Za-z0-9+/=_-]+'", "'nonce-…'", valor)
+        return valor
+
+    estavel = limpar([s for s in observacao["sondas"] if s["status"] != "pulada"])
+    return hashlib.sha256(
+        json.dumps(estavel, ensure_ascii=False, sort_keys=True).encode()
+    ).hexdigest()[:16]
+
+
+def _ultima_impressao(destino: Path) -> dict[str, str]:
+    """As impressões digitais da última coleta registrada na série."""
+    serie = destino / "serie.jsonl"
+    if not serie.exists():
+        return {}
+    ultimo_momento, impressoes = None, {}
+    for linha in serie.read_text(encoding="utf-8").splitlines():
+        if not linha.strip():
+            continue
+        try:
+            reg = json.loads(linha)
+        except json.JSONDecodeError:
+            continue
+        if reg.get("coletado_em") != ultimo_momento:
+            ultimo_momento, impressoes = reg.get("coletado_em"), {}
+        if reg.get("impressao"):
+            impressoes[reg["alvo"]] = reg["impressao"]
+    return impressoes
 
 
 def principal(argv: list[str] | None = None) -> int:
@@ -886,6 +979,11 @@ def principal(argv: list[str] | None = None) -> int:
     analisador.add_argument("--alvos", default=str(RAIZ / "alvos.yml"))
     analisador.add_argument("--saida", default=str(RAIZ / "dados"))
     analisador.add_argument("--host", action="append", help="observa só este host (repetível)")
+    analisador.add_argument(
+        "--completa",
+        action="store_true",
+        help="roda também as sondas diárias (crt.sh) e força gravar o instantâneo",
+    )
     argumentos = analisador.parse_args(argv)
 
     alvos = ler_alvos(Path(argumentos.alvos))
@@ -903,19 +1001,16 @@ def principal(argv: list[str] | None = None) -> int:
         "observacoes": [],
     }
 
+    destino = Path(argumentos.saida)
+    destino.mkdir(parents=True, exist_ok=True)
+    anteriores = _ultima_impressao(destino)
+
     for alvo in alvos:
         print(f"  observando {alvo['host']} ...", file=sys.stderr, flush=True)
-        coleta["observacoes"].append(observar(alvo))
+        coleta["observacoes"].append(observar(alvo, completa=argumentos.completa))
 
-    destino = Path(argumentos.saida)
-    dia = destino / momento.strftime("%Y") / momento.strftime("%m")
-    dia.mkdir(parents=True, exist_ok=True)
-
-    instantaneo = dia / f"{momento.strftime('%Y-%m-%dT%H%MZ')}.json"
-    instantaneo.write_text(
-        json.dumps(coleta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-
+    # A série é o arquivo permanente: uma linha compacta por alvo por coleta,
+    # sempre. É ela que sustenta a afirmação "medimos de hora em hora".
     serie = destino / "serie.jsonl"
     with serie.open("a", encoding="utf-8") as arquivo:
         for observacao in coleta["observacoes"]:
@@ -926,6 +1021,7 @@ def principal(argv: list[str] | None = None) -> int:
                         "alvo": observacao["alvo"],
                         "classe": observacao["classe"],
                         "nota": observacao["postura"]["nota"],
+                        "impressao": observacao["impressao"],
                         "sondas": {s["sonda"]: s["status"] for s in observacao["sondas"]},
                     },
                     ensure_ascii=False,
@@ -933,10 +1029,33 @@ def principal(argv: list[str] | None = None) -> int:
                 + "\n"
             )
 
+    # O instantâneo com os cabeçalhos inteiros só é gravado quando há o que
+    # guardar: alguma coisa mudou, ou é a coleta completa do dia. Guardar 23 KB
+    # de cabeçalhos idênticos a cada hora custaria 193 MB por ano de histórico
+    # que o Git nunca esquece, para registrar que nada aconteceu.
+    mudou = [
+        o["alvo"] for o in coleta["observacoes"] if anteriores.get(o["alvo"]) != o["impressao"]
+    ]
+    grava = bool(mudou) or argumentos.completa
+
+    instantaneo = None
+    if grava:
+        dia = destino / momento.strftime("%Y") / momento.strftime("%m")
+        dia.mkdir(parents=True, exist_ok=True)
+        instantaneo = dia / f"{momento.strftime('%Y-%m-%dT%H%MZ')}.json"
+        coleta["completa"] = argumentos.completa
+        coleta["mudaram"] = mudou
+        instantaneo.write_text(
+            json.dumps(coleta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
     conclusivas = sum(1 for o in coleta["observacoes"] for s in o["sondas"] if s["status"] == "ok")
-    total = sum(len(o["sondas"]) for o in coleta["observacoes"])
+    total = sum(1 for o in coleta["observacoes"] for s in o["sondas"] if s["status"] != "pulada")
+    motivo = "coleta completa" if argumentos.completa else f"mudou: {', '.join(mudou)}"
     print(
-        f"coleta gravada em {instantaneo} — {conclusivas}/{total} sondas conclusivas",
+        f"série: {len(coleta['observacoes'])} observações, "
+        f"{conclusivas}/{total} sondas conclusivas | "
+        + (f"instantâneo em {instantaneo} ({motivo})" if grava else "sem mudança, sem instantâneo"),
         file=sys.stderr,
     )
     return 0

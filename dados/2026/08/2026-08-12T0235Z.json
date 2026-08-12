@@ -1,0 +1,253 @@
+{
+  "coletado_em": "2026-08-12T02:35:18+00:00",
+  "versao_coletor": "1.0",
+  "observacoes": [
+    {
+      "alvo": "paulo-marcos-lucio.github.io",
+      "classe": "proprio",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://paulo-marcos-lucio.github.io/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=31556952",
+            "server": "GitHub.com"
+          },
+          "cookies": [],
+          "hsts": {
+            "max_age_segundos": 31556952,
+            "max_age_dias": 365.2,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": false,
+            "preload": false
+          },
+          "csp": null,
+          "csp_meta": {
+            "n_diretivas": 8,
+            "tem_default_src": true,
+            "tem_frame_ancestors": false,
+            "tem_object_src": false,
+            "usa_unsafe_inline": false,
+            "usa_unsafe_eval": false,
+            "usa_nonce": false,
+            "usa_strict_dynamic": false,
+            "ignoradas_por_estar_em_meta": []
+          }
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_128_GCM_SHA256",
+          "bits": 128,
+          "emissor": "Let's Encrypt",
+          "expira_em": "2026-09-02",
+          "dias_para_expirar": 21,
+          "n_sans": 6
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 200,
+          "existe": true,
+          "conforme_rfc9116": true,
+          "campos": [
+            "canonical",
+            "contact",
+            "expires",
+            "preferred-languages"
+          ]
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "github.io",
+          "a": [
+            "185.199.108.153",
+            "185.199.109.153",
+            "185.199.110.153",
+            "185.199.111.153"
+          ],
+          "aaaa": [
+            "2606:50c0:8000::153",
+            "2606:50c0:8001::153",
+            "2606:50c0:8002::153",
+            "2606:50c0:8003::153"
+          ],
+          "mx": [],
+          "caa": [
+            "0 issue \"digicert.com\"",
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"sectigo.com\"",
+            "0 issuewild \"digicert.com\"",
+            "0 issuewild \"letsencrypt.org\"",
+            "0 issuewild \"sectigo.com\""
+          ],
+          "spf": "\"v=spf1 a -all\"",
+          "dmarc": null,
+          "n_txt": 1
+        },
+        {
+          "sonda": "executar",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 3.9,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "CSP em <meta> (crédito parcial)",
+            1.4
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": []
+      },
+      "impressao": "e5f20d5bdbc5ab57"
+    },
+    {
+      "alvo": "web.dev",
+      "classe": "referencia",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://web.dev/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=63072000; includeSubdomains; preload",
+            "content-security-policy": "base-uri 'self'; object-src 'none'; script-src 'strict-dynamic' 'unsafe-inline' https: http: 'nonce-1ukmvejK8y7WV5bYClcKhU83N292G0' 'unsafe-eval'; frame-ancestors 'self' https://developers.google.com/_d/analytics-iframe; report-uri https://csp.withgoogle.com/csp/devsite/v2",
+            "x-content-type-options": "nosniff",
+            "server": "Google Frontend"
+          },
+          "cookies": [],
+          "hsts": {
+            "max_age_segundos": 63072000,
+            "max_age_dias": 730.0,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": true,
+            "preload": true
+          },
+          "csp": {
+            "n_diretivas": 5,
+            "tem_default_src": false,
+            "tem_frame_ancestors": true,
+            "tem_object_src": true,
+            "usa_unsafe_inline": true,
+            "usa_unsafe_eval": true,
+            "usa_nonce": true,
+            "usa_strict_dynamic": true
+          },
+          "csp_meta": null
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_256_GCM_SHA384",
+          "bits": 256,
+          "emissor": "Google Trust Services",
+          "expira_em": "2026-10-12",
+          "dias_para_expirar": 61,
+          "n_sans": 77
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 404,
+          "existe": false,
+          "conforme_rfc9116": false,
+          "campos": []
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "web.dev",
+          "a": [
+            "216.239.32.27"
+          ],
+          "aaaa": [
+            "2001:4860:4802:32::1b"
+          ],
+          "mx": [],
+          "caa": [
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"pki.goog\""
+          ],
+          "spf": null,
+          "dmarc": null,
+          "n_txt": 1
+        },
+        {
+          "sonda": "executar",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 6.3,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "HSTS cobre subdomínios",
+            0.5
+          ],
+          [
+            "CSP no cabeçalho",
+            1.3
+          ],
+          [
+            "X-Content-Type-Options: nosniff",
+            1.0
+          ],
+          [
+            "Enquadramento restrito",
+            1.0
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": []
+      },
+      "impressao": "88d7a81611a6e32e"
+    }
+  ],
+  "completa": false,
+  "mudaram": [
+    "paulo-marcos-lucio.github.io",
+    "web.dev"
+  ]
+}

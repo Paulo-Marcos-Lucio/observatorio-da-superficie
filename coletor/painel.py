@@ -110,6 +110,10 @@ def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
         s_antes, s_agora = sonda_de(antes, nome), sonda_de(agora, nome)
         if not s_antes or not s_agora:
             continue
+        # `pulada` não é mudança do alvo nem perda de visibilidade: é uma sonda
+        # que não roda toda hora, por decisão declarada.
+        if "pulada" in (s_antes["status"], s_agora["status"]):
+            continue
         if s_antes["status"] != s_agora["status"]:
             if s_agora["status"] == "inconclusivo":
                 mudancas.append(
@@ -274,6 +278,27 @@ def linha_da_tabela(observacao: dict[str, Any]) -> str:
     )
 
 
+def _resumo_da_serie() -> tuple[str, int]:
+    """(momento da última coleta, quantas coletas) lidos da série.
+
+    O painel não pode datar-se pelo último instantâneo: instantâneo só é
+    gravado quando algo muda, então um período estável faria o README parecer
+    parado enquanto a coleta seguia rodando de hora em hora.
+    """
+    serie = DADOS / "serie.jsonl"
+    if not serie.exists():
+        return "—", 0
+    momentos = set()
+    for linha in serie.read_text(encoding="utf-8").splitlines():
+        if not linha.strip():
+            continue
+        try:
+            momentos.add(json.loads(linha)["coletado_em"])
+        except (json.JSONDecodeError, KeyError):
+            continue
+    return (max(momentos) if momentos else "—"), len(momentos)
+
+
 def gerar_readme(historico: list[tuple[str, dict[str, Any]]]) -> str:
     marca, ultima = historico[-1]
     observacoes = sorted(
@@ -281,8 +306,11 @@ def gerar_readme(historico: list[tuple[str, dict[str, Any]]]) -> str:
         key=lambda o: (o["classe"] != "proprio", -(o["postura"]["nota"] or -1)),
     )
 
-    total_sondas = sum(len(o["sondas"]) for o in ultima["observacoes"])
+    total_sondas = sum(
+        1 for o in ultima["observacoes"] for s in o["sondas"] if s["status"] != "pulada"
+    )
     conclusivas = sum(1 for o in ultima["observacoes"] for s in o["sondas"] if s["status"] == "ok")
+    ultima_coleta, n_coletas = _resumo_da_serie()
 
     partes = [
         "# Observatório da Superfície",
@@ -296,9 +324,15 @@ def gerar_readme(historico: list[tuple[str, dict[str, Any]]]) -> str:
         "que passou a ser emitido por outro fornecedor, o subdomínio de homologação que",
         "apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.",
         "",
-        f"**Última coleta:** {ultima['coletado_em']} · "
-        f"**{conclusivas}/{total_sondas} sondas conclusivas** · "
-        f"**{len(historico)} coletas** na série",
+        f"**Última coleta:** {ultima_coleta} · "
+        f"**{n_coletas} coletas** na série (de hora em hora) · "
+        f"**{len(historico)} instantâneos** guardados",
+        "",
+        f"O quadro abaixo é do instantâneo de `{ultima['coletado_em']}`, "
+        f"com {conclusivas}/{total_sondas} sondas conclusivas. Instantâneo com os",
+        "cabeçalhos inteiros só é guardado quando alguma coisa muda — a série",
+        "registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora",
+        "seriam 193 MB por ano de histórico para dizer que nada aconteceu.",
         "",
         "## Postura observada",
         "",

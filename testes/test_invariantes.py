@@ -686,5 +686,134 @@ def test_linha_da_tabela_tem_sempre_o_mesmo_numero_de_colunas():
     assert sem.split("|")[3].strip() == "barrado na borda"
 
 
+# --------------------------------------------------------------------------
+# 10. Coleta horária: três estados, e impressão que não confunde ruído
+# --------------------------------------------------------------------------
+
+
+def test_pulada_e_um_terceiro_estado():
+    """`pulada` não é `inconclusivo`.
+
+    Inconclusivo é "tentei e não soube". Pulada é "não tentei, por decisão
+    declarada". Colapsar os dois faria a série dizer que o crt.sh estava fora
+    do ar 23 horas por dia, quando na verdade nem foi consultado.
+    """
+    p = coleta._pulada("transparencia_certificados", "sonda diária")
+
+    assert p["status"] == "pulada"
+    assert p["status"] != "inconclusivo"
+    assert p["motivo"]
+
+
+def test_sonda_pulada_nao_conta_como_perda_de_visibilidade():
+    def obs(status_ct):
+        sonda = {"sonda": "transparencia_certificados", "status": status_ct}
+        if status_ct != "ok":
+            sonda["motivo"] = "sonda diária"
+        else:
+            sonda.update({"dominio_raiz": "x.test", "n_nomes_distintos": 3})
+        return {"alvo": "x", "classe": "referencia", "sondas": [sonda]}
+
+    mudancas = painel.comparar(obs("ok"), obs("pulada"))
+    assert mudancas == [], mudancas
+
+
+def test_impressao_ignora_nonce_e_dias_para_expirar():
+    """Duas coletas idênticas separadas por uma hora precisam ter a mesma
+    impressão, senão o coletor gravaria um instantâneo de 23 KB por hora para
+    registrar que o nonce rotacionou."""
+
+    def obs(nonce, dias):
+        return {
+            "alvo": "x",
+            "classe": "proprio",
+            "sondas": [
+                {
+                    "sonda": "cabecalhos",
+                    "status": "ok",
+                    "cabecalhos": {"content-security-policy": f"script-src 'nonce-{nonce}'"},
+                    "cookies": [],
+                    "hsts": None,
+                    "csp": None,
+                    "csp_meta": None,
+                },
+                {"sonda": "tls", "status": "ok", "versao": "TLSv1.3", "dias_para_expirar": dias},
+            ],
+        }
+
+    assert coleta._impressao(obs("AAAA", 30)) == coleta._impressao(obs("BBBB", 29))
+
+
+def test_impressao_muda_quando_a_postura_muda():
+    """O dual: silenciar ruído não pode silenciar sinal."""
+
+    def obs(cabecalhos):
+        return {
+            "alvo": "x",
+            "classe": "proprio",
+            "sondas": [
+                {
+                    "sonda": "cabecalhos",
+                    "status": "ok",
+                    "cabecalhos": cabecalhos,
+                    "cookies": [],
+                    "hsts": None,
+                    "csp": None,
+                    "csp_meta": None,
+                }
+            ],
+        }
+
+    antes = obs({"strict-transport-security": "max-age=31536000"})
+    depois = obs({})
+
+    assert coleta._impressao(antes) != coleta._impressao(depois)
+
+
+def test_impressao_ignora_sonda_pulada():
+    """A coleta completa do dia roda o crt.sh e a horária não. Se a impressão
+    contasse a sonda pulada, toda coleta completa pareceria mudança."""
+    base = {
+        "sonda": "cabecalhos",
+        "status": "ok",
+        "cabecalhos": {},
+        "cookies": [],
+        "hsts": None,
+        "csp": None,
+        "csp_meta": None,
+    }
+    horaria = {
+        "alvo": "x",
+        "classe": "proprio",
+        "sondas": [base, coleta._pulada("transparencia_certificados", "diária")],
+    }
+    completa = {"alvo": "x", "classe": "proprio", "sondas": [base]}
+
+    assert coleta._impressao(horaria) == coleta._impressao(completa)
+
+
+def test_sondas_de_hora_nao_incluem_servico_comunitario():
+    """crt.sh é gratuito e mantido por terceiros. 96 consultas diárias por
+    domínio seriam abuso de uma infraestrutura que ninguém paga."""
+    horarias = {s.sonda_nome for s in coleta.SONDAS_DE_HORA}
+    diarias = {s.sonda_nome for s in coleta.SONDAS_DO_DIA}
+
+    assert "transparencia_certificados" not in horarias
+    assert "transparencia_certificados" in diarias
+
+
+def test_sonda_pulada_carrega_o_nome_certo():
+    """O decorador `@sonda` envolve a função; sem preservar o nome, a sonda
+    pulada iria para a série registrada como `executar`."""
+    for s in coleta.SONDAS_DE_HORA + coleta.SONDAS_DO_DIA:
+        assert s.sonda_nome != "executar"
+        assert s.__name__.startswith("sondar_")
+
+    obs = coleta.observar({"host": "exemplo.invalid", "classe": "proprio"}, completa=False)
+    puladas = [s for s in obs["sondas"] if s["status"] == "pulada"]
+
+    assert [s["sonda"] for s in puladas] == ["transparencia_certificados"]
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
