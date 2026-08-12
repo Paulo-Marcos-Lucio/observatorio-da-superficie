@@ -111,12 +111,23 @@ jobs:
           MOMENTO=$(date -u +'%Y-%m-%dT%H:%MZ')
           ALVOS=$(python - <<'PY'
           import json, pathlib
-          arquivos = sorted(pathlib.Path("dados").glob("*/*/*.json"))
-          coleta = json.loads(arquivos[-1].read_text(encoding="utf-8"))
-          obs = coleta["observacoes"]
-          ok = sum(1 for o in obs for s in o["sondas"] if s["status"] == "ok")
-          total = sum(len(o["sondas"]) for o in obs)
-          print(f"{len(obs)} alvos, {ok}/{total} sondas conclusivas")
+
+          # A contagem sai da SÉRIE, não do último instantâneo: instantâneo só
+          # é gravado quando algo muda, então numa hora estável ele seria de
+          # outra hora e a mensagem dataria o commit errado.
+          linhas = [
+              json.loads(l)
+              for l in pathlib.Path("dados/serie.jsonl").read_text(encoding="utf-8").splitlines()
+              if l.strip()
+          ]
+          momento = max(r["coletado_em"] for r in linhas)
+          agora = [r for r in linhas if r["coletado_em"] == momento]
+
+          # Sonda `pulada` fica fora do denominador: ela não foi tentada, então
+          # contá-la como não-conclusiva afirmaria uma falha que não houve.
+          estados = [e for r in agora for e in r["sondas"].values() if e != "pulada"]
+          ok = sum(1 for e in estados if e == "ok")
+          print(f"{len(agora)} alvos, {ok}/{len(estados)} sondas conclusivas")
           PY
           )
 
