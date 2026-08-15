@@ -4,3 +4,7 @@ __pycache__/
 .hypothesis/
 .ruff_cache/
 .venv/
+
+# Dado do produto mora em dados/AAAA/MM/. JSON solto na raiz é sempre
+# artefato de sessão (dump de `gh run list`, rascunho), nunca série.
+/*.json
