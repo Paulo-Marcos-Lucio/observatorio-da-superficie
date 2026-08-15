@@ -815,5 +815,49 @@ def test_sonda_pulada_carrega_o_nome_certo():
     assert [s["sonda"] for s in puladas] == ["transparencia_certificados"]
 
 
+def test_nenhum_cabecalho_enviado_tem_byte_nao_ascii():
+    """Field-value de cabeçalho HTTP é US-ASCII.
+
+    A versão anterior da `User-Agent` trazia `cabeçalhos`, `públicos` e
+    `requisições` — 4 bytes latin-1 crus na rede. A Cloudflare lê cabeçalho
+    malformado como assinatura de ataque e devolve 403: owasp.org e
+    www.cloudflare.com ficaram sem nota de cabeçalho enquanto isso durou, e o
+    observatório publicou "inconclusivo" para 2 dos 6 alvos sem saber por quê.
+
+    O teste é sobre o dicionário inteiro, não sobre a `User-Agent`: cabeçalho
+    novo entra em `CABECALHOS_ENVIADOS` e cai nesta rede automaticamente.
+    """
+    for nome, valor in coleta.CABECALHOS_ENVIADOS.items():
+        assert nome.isascii(), f"nome de cabeçalho não-ASCII: {nome!r}"
+        assert valor.isascii(), f"valor não-ASCII em {nome!r}: {valor!r}"
+
+
+@given(
+    sujo=st.text(
+        alphabet=st.characters(min_codepoint=128, max_codepoint=255),
+        min_size=1,
+        max_size=4,
+    )
+)
+@settings(max_examples=25)
+def test_cabecalho_nao_ascii_e_barrado_antes_da_rede(sujo: str):
+    """Qualquer byte não-ASCII, não só os quatro que apareceram.
+
+    Barrar antes de abrir a conexão é o que transforma o defeito em
+    `inconclusivo` com motivo — em vez de um 403 da borda do alvo sendo medido
+    e publicado como se fosse a resposta dele.
+
+    `tentativas=1` é sobre o custo de uma regressão: se a checagem sumir, este
+    teste passa a tentar a rede de verdade, e com as 3 tentativas padrão a
+    suíte leva minutos para falhar em vez de segundos.
+    """
+    with pytest.raises(ValueError, match="não-ASCII"):
+        coleta._abrir(
+            "https://exemplo.invalid/",
+            tentativas=1,
+            cabecalhos_extra={"X-Teste": sujo},
+        )
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

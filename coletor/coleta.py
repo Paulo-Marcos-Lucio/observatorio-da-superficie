@@ -37,11 +37,24 @@ from typing import Any
 
 RAIZ = Path(__file__).resolve().parent.parent
 
+# Sem acento, e isto não é preferência de estilo: field-value de cabeçalho HTTP
+# é US-ASCII. Os 4 bytes latin-1 que "cabeçalhos públicos; requisições" punha na
+# rede (0xE7 0xFA 0xE7 0xF5) fazem a Cloudflare responder 403 na raiz de
+# owasp.org e de www.cloudflare.com — cabeçalho malformado tem assinatura de
+# ataque. Medido em 2026-08-15, mesma URL e mesmo minuto, só mudando o acento:
+# com acento, 403 servido pela cloudflare; em ASCII, 200 com CSP e HSTS.
+#
+# Não é contornar bloqueio. Mesma identidade, mesma URL, mesma frequência: é
+# parar de mandar cabeçalho quebrado.
 AGENTE = (
     "ObservatorioDaSuperficie/1.0 "
     "(+https://github.com/Paulo-Marcos-Lucio/observatorio-da-superficie; "
-    "coleta passiva de cabeçalhos públicos; 4 requisições por hora)"
+    "coleta passiva de cabecalhos publicos; 4 requisicoes por hora)"
 )
+
+# Fonte única do que o coletor põe na rede. Cabeçalho novo entra aqui, e o
+# invariante de ASCII em `_abrir` passa a cobri-lo sozinho.
+CABECALHOS_ENVIADOS = {"User-Agent": AGENTE}
 
 TEMPO_LIMITE = 15
 
@@ -95,9 +108,21 @@ def _abrir(
     executor é intermitente e um timeout não diz nada sobre o alvo. Já 3xx e
     4xx são *resposta* — voltam de primeira, sem repetição.
     """
-    pedido = urllib.request.Request(
-        url, method=metodo, headers={"User-Agent": AGENTE, **(cabecalhos_extra or {})}
-    )
+    cabecalhos = {**CABECALHOS_ENVIADOS, **(cabecalhos_extra or {})}
+
+    # Byte não-ASCII em field-value é cabeçalho malformado, e WAF trata isso
+    # como ataque: o alvo responde 403 e a sonda mede a página de bloqueio em
+    # vez do site. Barrar aqui, antes da rede, faz o `@sonda` registrar
+    # `inconclusivo` com o motivo em vez de publicar um 403 como se fosse
+    # resposta do alvo — a mesma doutrina que já vale para o resto: não medir
+    # não é medir ausência.
+    for nome, valor in cabecalhos.items():
+        if not valor.isascii():
+            raise ValueError(
+                f"cabeçalho {nome!r} tem byte não-ASCII e não pode ir para a rede: {valor!r}"
+            )
+
+    pedido = urllib.request.Request(url, method=metodo, headers=cabecalhos)
     abridor = urllib.request.build_opener(SemRedirecionamento)
     ultimo: Exception | None = None
 
