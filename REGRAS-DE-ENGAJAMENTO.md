@@ -7,7 +7,7 @@ O que segue é o limite.
 
 ## O que é coletado
 
-Por alvo, uma vez a cada quatro horas:
+Por alvo, uma vez por hora:
 
 | Sonda | O que faz | Natureza |
 |---|---|---|
@@ -18,15 +18,22 @@ Por alvo, uma vez a cada quatro horas:
 | `dns` | consulta DNS por DoH ao resolvedor da Cloudflare | não toca no alvo |
 | `transparencia_certificados` | consulta ao crt.sh | não toca no alvo |
 
-Total: **quatro requisições HTTP por alvo por coleta, seis coletas ao dia — 24
-requisições diárias.** Um navegador carregando a página inicial uma única vez
-dispara mais requisições do que isso; um serviço de monitoramento comum bate a
-cada cinco minutos, o que dá 288 por dia.
+O `transparencia_certificados` é a exceção: ele não roda de hora em hora. O
+crt.sh é serviço comunitário gratuito e certificado novo não aparece a cada
+hora, então essa sonda sai uma vez por dia, na coleta das 03h UTC.
 
-A resolução de quatro horas existe porque é ela que distingue "o cabeçalho
-sumiu" de "o cabeçalho sumiu e voltou". Uma amostra a cada doze horas passa por
-cima de uma janela de manutenção inteira — e o deploy revertido às pressas é o
-evento mais informativo que este observatório pode registrar.
+Total: **quatro requisições HTTP por alvo por coleta, uma coleta por hora — teto
+de 96 requisições diárias por alvo.** Na prática sai menos, porque o agendador
+do GitHub Actions atrasa e às vezes pula: nas primeiras 91 horas de operação
+saíram 74 coletas, 80% da agenda, o que dá uma média de 78 requisições por dia
+por alvo. Um serviço de monitoramento comum bate a cada cinco minutos, o que dá
+288 por dia — e um navegador carregando a página inicial uma única vez dispara
+mais requisições do que uma coleta inteira.
+
+A resolução de uma hora existe porque é ela que distingue "o cabeçalho sumiu" de
+"o cabeçalho sumiu e voltou". Uma amostra a cada doze horas passa por cima de
+uma janela de manutenção inteira — e o deploy revertido às pressas é o evento
+mais informativo que este observatório pode registrar.
 
 ## O que nunca é coletado
 
