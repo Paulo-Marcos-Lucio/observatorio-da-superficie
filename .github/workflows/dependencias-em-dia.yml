@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: O classificador está correto?
         # Antes de deixar um script decidir merge sozinho, ele prova que ainda
