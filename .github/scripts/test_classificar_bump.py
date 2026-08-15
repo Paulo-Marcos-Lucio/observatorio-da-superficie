@@ -95,6 +95,41 @@ CASOS = [
         '-  "react": "^18.2.0",\n+  "react": "^19.0.0",\n',
         False,
     ),
+    # --- Tag simples (`@v5`), a forma mais comum de fixar uma action ---------
+    #
+    # O classificador exigia `major.minor` para reconhecer uma versão. `v5` não
+    # tem minor: a linha não casava com padrão nenhum e a troca ficava
+    # *invisível* — nem em `comuns`, nem em `orfas`, nem numa explicação. O
+    # primeiro caso abaixo é o que realmente aconteceu em produção
+    # (observatorio-da-superficie#1, 2026-08-15): o job disse "nenhuma troca de
+    # versão pôde ser lida" para um diff que só fazia checkout@v5 -> @v7.
+    (
+        "action em tag simples, major",
+        "-      - uses: actions/checkout@v5\n+      - uses: actions/checkout@v7\n",
+        False,
+    ),
+    (
+        "action em tag simples, minor",
+        "-      - uses: actions/setup-python@v6.1\n+      - uses: actions/setup-python@v6.4\n",
+        True,
+    ),
+    (
+        "FALHA ABERTA: minor legível ao lado de major invisível em tag simples",
+        "-hypothesis==6.122.1\n+hypothesis==6.165.0\n"
+        "-      - uses: actions/checkout@v5\n+      - uses: actions/checkout@v7\n",
+        False,
+    ),
+    (
+        "SHA que começa com dígito não pode ser lido como versão",
+        "-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.1.0\n"
+        "+      - uses: actions/checkout@91bd71901bbe5b1630ceea73d27597364c9af683 # v5.2.0\n",
+        True,
+    ),
+    (
+        "dependência com versão ilegível não pode ser invisível",
+        "-hypothesis==6.122.1\n+hypothesis==6.165.0\n-pacote==alfa\n+pacote==beta\n",
+        False,
+    ),
 ]
 
 falhas = 0
