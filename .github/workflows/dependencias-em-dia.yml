@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: O classificador está correto?
         # Antes de deixar um script decidir merge sozinho, ele prova que ainda
@@ -92,7 +92,18 @@ jobs:
             fi
 
             # --- 2. dá para PROVAR que não é major? ---
-            gh pr diff "$NUMERO" -R "$REPO" > /tmp/pr.diff || true
+            # Diff parcial não é prova. O vazio cai no caminho seguro
+            # ("nenhuma troca de versão pôde ser lida" -> não mescla). O parcial
+            # é pior: se o corte cai exatamente no fim de um par -/+ não-major,
+            # a guarda de órfãs não vê nada estranho e o major que ficou de fora
+            # do arquivo é aprovado. Medido com um diff de 4 linhas
+            # (pytest 8.3->8.4 e hypothesis 6->7): inteiro sai 1; as 2 primeiras
+            # linhas saem 0.
+            if ! gh pr diff "$NUMERO" -R "$REPO" > /tmp/pr.diff; then
+              echo "não foi possível obter o diff — não mescla no escuro"
+              echo "::endgroup::"
+              continue
+            fi
 
             if python3 .github/scripts/classificar_bump.py /tmp/pr.diff; then
               echo "não-major comprovado e checks verdes; mesclando"
