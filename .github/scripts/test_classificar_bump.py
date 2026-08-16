@@ -130,6 +130,40 @@ CASOS = [
         "-hypothesis==6.122.1\n+hypothesis==6.165.0\n-pacote==alfa\n+pacote==beta\n",
         False,
     ),
+    # --- Dependência entre aspas (pyproject.toml) --------------------------
+    #
+    # Segunda casca da mesma classe da tag simples, encontrada em auditoria no
+    # mesmo dia em que a primeira foi fechada. Em `pyproject.toml` a dependência
+    # é item de lista de string: `  "typer>=0.27",`. Com a aspa na frente, o
+    # padrão de requirements (nome no começo) não casa e o de package.json
+    # (`"nome": "versão"`) também não — a troca ficava invisível.
+    #
+    # Custo real medido: `esteira#17` eram três patches em pyproject e o
+    # classificador respondeu "nenhuma troca de versão pôde ser lida". Recusou —
+    # mas por cegueira, não por prova. O terceiro caso é o que importa: ao lado
+    # de uma linha legível, o major entre aspas era aprovado.
+    (
+        "dependência entre aspas no pyproject, patch",
+        '-  "typer>=0.27",\n+  "typer>=0.27.1",\n',
+        True,
+    ),
+    (
+        "dependência entre aspas no pyproject, major",
+        '-  "typer>=0.27",\n+  "typer>=1.0",\n',
+        False,
+    ),
+    (
+        "FALHA ABERTA: patch legível ao lado de major entre aspas",
+        '-hypothesis==6.122.1\n+hypothesis==6.165.0\n-  "typer>=0.27",\n+  "typer>=1.0",\n',
+        False,
+    ),
+    (
+        "grupo de patches entre aspas — o caso real do esteira#17",
+        '-  "typer>=0.27",\n+  "typer>=0.27.1",\n'
+        '-  "ruff>=0.16.1",\n+  "ruff>=0.16.2",\n'
+        '-  "hypothesis>=6.165.0",\n+  "hypothesis>=6.165.2",\n',
+        True,
+    ),
 ]
 
 falhas = 0

@@ -93,13 +93,22 @@ _SEM_VERSAO_LEGIVEL = (
 
 
 def _corpo(linha: str) -> str:
-    """Conteúdo da linha de diff, sem o sinal e sem o marcador de item YAML.
+    """Conteúdo da linha de diff, sem o sinal e sem o que envolve a declaração.
 
-    O marcador precisa sair antes do casamento. A linha real de um workflow é
-    ``      - uses: acao@sha # v7.0.1``; depois do ``strip()`` ela começa com
-    ``- uses:``, e um padrão ancorado em ``^uses:`` não casa.
+    Duas cascas precisam sair antes do casamento, e as duas já custaram caro:
+
+    * o marcador de item YAML — a linha real de um workflow é
+      ``      - uses: acao@sha # v7.0.1``; depois do ``strip()`` ela começa com
+      ``- uses:``, e um padrão ancorado em ``^uses:`` não casa;
+    * a aspa de abertura — em ``pyproject.toml`` a dependência é item de lista
+      de string (``  "typer>=0.27",``). Com a aspa na frente, nem o padrão de
+      requirements (que espera o nome no começo) nem o de package.json (que
+      espera ``"nome": "versão"``) casam, e a troca fica invisível. Foi assim
+      que ``esteira#17`` — três patches — saiu como "nenhuma troca de versão
+      pôde ser lida", e é a mesma classe da tag simples de action.
     """
-    return re.sub(r"^-\s+", "", linha[1:].strip())
+    corpo = re.sub(r"^-\s+", "", linha[1:].strip())
+    return re.sub(r'^["\']', "", corpo)
 
 
 def _extrair(linha: str) -> tuple[str, tuple[int, int]] | None:
