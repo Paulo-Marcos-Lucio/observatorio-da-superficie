@@ -9,9 +9,9 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-08-15T23:37:52+00:00 · **80 coletas** na série (de hora em hora) · **79 instantâneos** guardados
+**Última coleta:** 2026-08-16T02:00:08+00:00 · **81 coletas** na série (de hora em hora) · **80 instantâneos** guardados
 
-O quadro abaixo é do instantâneo de `2026-08-15T23:37:52+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
+O quadro abaixo é do instantâneo de `2026-08-16T02:00:08+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
 cabeçalhos inteiros só é guardado quando alguma coisa muda — a série
 registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora
 seriam 193 MB por ano de histórico para dizer que nada aconteceu.
@@ -20,10 +20,10 @@ seriam 193 MB por ano de histórico para dizer que nada aconteceu.
 
 | Alvo | Classe | Nota | HSTS | CSP | Enquadr. | nosniff | Referrer | security.txt | Cert. |
 |---|---|---|---|---|---|---|---|---|---|
-| `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 77d |
+| `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 76d |
 | `owasp.org` | referencia | **7.8** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 51d |
 | `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 88d |
-| `github.com` | referencia | **7.5** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 46d |
+| `github.com` | referencia | **7.5** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 45d |
 | `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 36d |
 | `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 57d |
 
