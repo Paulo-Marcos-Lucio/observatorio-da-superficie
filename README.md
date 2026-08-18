@@ -9,9 +9,9 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-08-18T13:11:48+00:00 · **137 coletas** na série (de hora em hora) · **136 instantâneos** guardados
+**Última coleta:** 2026-08-18T13:59:48+00:00 · **138 coletas** na série (de hora em hora) · **137 instantâneos** guardados
 
-O quadro abaixo é do instantâneo de `2026-08-18T13:11:48+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
+O quadro abaixo é do instantâneo de `2026-08-18T13:59:48+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
 cabeçalhos inteiros só é guardado quando alguma coisa muda — a série
 registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora
 seriam 193 MB por ano de histórico para dizer que nada aconteceu.
