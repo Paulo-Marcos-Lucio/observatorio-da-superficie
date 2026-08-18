@@ -2,5 +2,5 @@
 # funcionando daqui a um ano sem manutenção de dependência.
 # Estas dependências existem só para desenvolver e testar.
 pytest==9.1.1
-hypothesis==6.165.2
-ruff==0.16.2
+hypothesis==6.165.9
+ruff==0.16.3
