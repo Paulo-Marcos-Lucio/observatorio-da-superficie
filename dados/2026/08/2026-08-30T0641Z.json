@@ -1,0 +1,917 @@
+{
+  "coletado_em": "2026-08-30T06:41:47+00:00",
+  "versao_coletor": "1.0",
+  "observacoes": [
+    {
+      "alvo": "paulo-marcos-lucio.github.io",
+      "classe": "proprio",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://paulo-marcos-lucio.github.io/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=31556952",
+            "server": "GitHub.com"
+          },
+          "cookies": [],
+          "hsts": {
+            "max_age_segundos": 31556952,
+            "max_age_dias": 365.2,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": false,
+            "preload": false
+          },
+          "csp": null,
+          "csp_meta": {
+            "n_diretivas": 8,
+            "tem_default_src": true,
+            "tem_frame_ancestors": false,
+            "tem_object_src": false,
+            "usa_unsafe_inline": false,
+            "usa_unsafe_eval": false,
+            "usa_nonce": false,
+            "usa_strict_dynamic": false,
+            "ignoradas_por_estar_em_meta": []
+          }
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_128_GCM_SHA256",
+          "bits": 128,
+          "emissor": "Let's Encrypt",
+          "expira_em": "2026-10-31",
+          "dias_para_expirar": 62,
+          "n_sans": 6
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 200,
+          "existe": true,
+          "conforme_rfc9116": true,
+          "campos": [
+            "canonical",
+            "contact",
+            "expires",
+            "preferred-languages"
+          ]
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "github.io",
+          "a": [
+            "185.199.108.153",
+            "185.199.109.153",
+            "185.199.110.153",
+            "185.199.111.153"
+          ],
+          "aaaa": [
+            "2606:50c0:8000::153",
+            "2606:50c0:8001::153",
+            "2606:50c0:8002::153",
+            "2606:50c0:8003::153"
+          ],
+          "mx": [],
+          "caa": [
+            "0 issue \"digicert.com\"",
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"sectigo.com\"",
+            "0 issuewild \"digicert.com\"",
+            "0 issuewild \"letsencrypt.org\"",
+            "0 issuewild \"sectigo.com\""
+          ],
+          "spf": "\"v=spf1 a -all\"",
+          "dmarc": null,
+          "n_txt": 1
+        },
+        {
+          "sonda": "transparencia_certificados",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 3.9,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "CSP em <meta> (crédito parcial)",
+            1.4
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": []
+      },
+      "impressao": "17c53d4f60f7f070"
+    },
+    {
+      "alvo": "github.com",
+      "classe": "referencia",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://github.com/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [
+            "content-security-policy"
+          ],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=31536000; includeSubdomains; preload",
+            "content-security-policy": "default-src 'none'; base-uri 'self'; child-src github.githubassets.com github.com/assets-cdn/worker/ github.com/assets/ gist.github.com/assets-cdn/worker/; connect-src 'self' uploads.github.com www.githubstatus.com collector.github.com raw.githubusercontent.com api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com *.rel.tunnels.api.visualstudio.com wss://*.rel.tunnels.api.visualstudio.com github.githubassets.com objects-origin.gith",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "deny",
+            "referrer-policy": "origin-when-cross-origin, strict-origin-when-cross-origin",
+            "server": "github.com"
+          },
+          "cookies": [
+            {
+              "nome": "_gh_sess",
+              "secure": true,
+              "httponly": true,
+              "samesite": "Lax"
+            },
+            {
+              "nome": "_octo",
+              "secure": true,
+              "httponly": false,
+              "samesite": "Lax"
+            },
+            {
+              "nome": "logged_in",
+              "secure": true,
+              "httponly": true,
+              "samesite": "Lax"
+            }
+          ],
+          "hsts": {
+            "max_age_segundos": 31536000,
+            "max_age_dias": 365.0,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": true,
+            "preload": true
+          },
+          "csp": {
+            "n_diretivas": 15,
+            "tem_default_src": true,
+            "tem_frame_ancestors": true,
+            "tem_object_src": false,
+            "usa_unsafe_inline": true,
+            "usa_unsafe_eval": false,
+            "usa_nonce": false,
+            "usa_strict_dynamic": false
+          },
+          "csp_meta": null
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_128_GCM_SHA256",
+          "bits": 128,
+          "emissor": "Sectigo Limited",
+          "expira_em": "2026-09-30",
+          "dias_para_expirar": 31,
+          "n_sans": 2
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 200,
+          "existe": true,
+          "conforme_rfc9116": true,
+          "campos": [
+            "acknowledgments",
+            "canonical",
+            "contact",
+            "expires",
+            "hiring",
+            "policy",
+            "preferred-languages"
+          ]
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "github.com",
+          "a": [
+            "140.82.112.4"
+          ],
+          "aaaa": [],
+          "mx": [
+            "0 github-com.mail.protection.outlook.com."
+          ],
+          "caa": [
+            "0 issue \"digicert.com\"",
+            "0 issue \"globalsign.com\"",
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"sectigo.com\"",
+            "0 issuewild \"digicert.com\"",
+            "0 issuewild \"letsencrypt.org\"",
+            "0 issuewild \"sectigo.com\""
+          ],
+          "spf": "\"v=spf1 ip4:192.30.252.0/22 include:spf.protection.outlook.com include:_netblocks.google.com include:_netblocks2.google.com include:mail.zendesk.com include:_spf.salesforce.com include:servers.mcsv.net include:mktomail.com include:sendgrid.net ip4:62.253.2\" \"27.114 ip4:166.78.69.169 ip4:166.78.69.170 ip4:166.78.71.131 ~all\"",
+          "dmarc": "\"v=DMARC1; p=quarantine; sp=reject; pct=100; rua=mailto:dmarc@github.com; ruf=mailto:dmarc@github.com; fo=1\"",
+          "n_txt": 23
+        },
+        {
+          "sonda": "transparencia_certificados",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 7.5,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "HSTS cobre subdomínios",
+            0.5
+          ],
+          [
+            "CSP no cabeçalho",
+            1.8
+          ],
+          [
+            "X-Content-Type-Options: nosniff",
+            1.0
+          ],
+          [
+            "Enquadramento restrito",
+            1.0
+          ],
+          [
+            "Referrer-Policy restritiva",
+            1.0
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": [
+          [
+            "cookie _octo sem HttpOnly",
+            -0.3
+          ]
+        ]
+      },
+      "impressao": "cbdf95df23feb80d"
+    },
+    {
+      "alvo": "www.mozilla.org",
+      "classe": "referencia",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://www.mozilla.org/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [
+            "content-security-policy",
+            "content-security-policy-report-only"
+          ],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=31536000",
+            "content-security-policy": "base-uri 'none'; object-src 'none'; upgrade-insecure-requests; default-src 'self' *.mozilla.org; frame-src 'self' accounts.firefox.com gtm.mozilla.org js.stripe.com www.google-analytics.com www.googletagmanager.com www.youtube.com; media-src 'self' assets.mozilla.net videos.cdn.mozilla.net www.mozilla.org; style-src 'self' 'unsafe-inline' cdn.transcend.io transcend-cdn.com www.mozilla.org; font-src 'self' www.mozilla.org; connect-src 'self' *.analytics.google.com *.google-analytics.com *.googletagmanager.com analytics.google.com cdn.transcend.io google-analytics.com googletagmanager.com gtm.mo",
+            "content-security-policy-report-only": "base-uri 'none'; object-src 'none'; upgrade-insecure-requests; default-src 'self' *.mozilla.org; frame-src 'self' accounts.firefox.com gtm.mozilla.org js.stripe.com www.google-analytics.com www.googletagmanager.com www.youtube.com; media-src 'self' assets.mozilla.net videos.cdn.mozilla.net www.mozilla.org; style-src 'self' 'unsafe-inline' cdn.transcend.io transcend-cdn.com www.mozilla.org; font-src 'self' www.mozilla.org; connect-src 'self' *.analytics.google.com *.google-analytics.com *.googletagmanager.com analytics.google.com cdn.transcend.io google-analytics.com googletagmanager.com gtm.mo",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "cross-origin-opener-policy": "same-origin",
+            "server": "granian"
+          },
+          "cookies": [],
+          "hsts": {
+            "max_age_segundos": 31536000,
+            "max_age_dias": 365.0,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": false,
+            "preload": false
+          },
+          "csp": {
+            "n_diretivas": 14,
+            "tem_default_src": true,
+            "tem_frame_ancestors": true,
+            "tem_object_src": true,
+            "usa_unsafe_inline": true,
+            "usa_unsafe_eval": true,
+            "usa_nonce": false,
+            "usa_strict_dynamic": false
+          },
+          "csp_meta": null
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_128_GCM_SHA256",
+          "bits": 128,
+          "emissor": "Let's Encrypt",
+          "expira_em": "2026-11-20",
+          "dias_para_expirar": 81,
+          "n_sans": 1
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 200,
+          "existe": true,
+          "conforme_rfc9116": false,
+          "campos": [
+            "bounty program",
+            "email",
+            "main info"
+          ]
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "mozilla.org",
+          "a": [
+            "151.101.131.19",
+            "151.101.195.19",
+            "151.101.3.19",
+            "151.101.67.19",
+            "www-mozilla.fastly-edge.com."
+          ],
+          "aaaa": [
+            "2a04:4e42:200::787",
+            "2a04:4e42:400::787",
+            "2a04:4e42:600::787",
+            "2a04:4e42::787",
+            "www-mozilla.fastly-edge.com."
+          ],
+          "mx": [
+            "1 aspmx.l.google.com.",
+            "10 aspmx3.googlemail.com.",
+            "5 alt1.aspmx.l.google.com.",
+            "5 alt2.aspmx.l.google.com."
+          ],
+          "caa": [
+            "0 iodef \"mailto:foxsec+caaiodef@mozilla.com\"",
+            "0 issue \"amazon.com\"",
+            "0 issue \"amazonaws.com\"",
+            "0 issue \"amazontrust.com\"",
+            "0 issue \"awstrust.com\"",
+            "0 issue \"certainly.com\"",
+            "0 issue \"comodoca.com\"",
+            "0 issue \"digicert.com\"",
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"pki.goog\"",
+            "0 issue \"sectigo.com\""
+          ],
+          "spf": "\"v=spf1 include:%{i}._ip.%{h}._ehlo.%{d}._spf.vali.email include:_spf.mozilla.com include:_spf.google.com include:spf.fundraiseup.com ~all\"",
+          "dmarc": "\"v=DMARC1; p=reject; pct=100; adkim=r; aspf=r; rua=mailto:dmarc_agg@vali.email,mailto:dmarc@mozilla.com\"",
+          "n_txt": 17
+        },
+        {
+          "sonda": "transparencia_certificados",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 7.3,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "CSP no cabeçalho",
+            1.3
+          ],
+          [
+            "X-Content-Type-Options: nosniff",
+            1.0
+          ],
+          [
+            "Enquadramento restrito",
+            1.0
+          ],
+          [
+            "Referrer-Policy restritiva",
+            1.0
+          ],
+          [
+            "COOP",
+            0.5
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": []
+      },
+      "impressao": "f2f58f56436b5dbd"
+    },
+    {
+      "alvo": "www.cloudflare.com",
+      "classe": "referencia",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://www.cloudflare.com/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [
+            "content-security-policy"
+          ],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://static-staging.cloudflareinsights.com https://challenges.cloudflare.com https://*.onetrust.com https://cdn.cookielaw.org https://ot.www.cloudflare.com https://www.googletagmanager.com https://tagmanager.google.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://adservice.google.com https://cdn.bizible.com https://js.adsrvr.org https://*.marketo.net https://platform.twitter.com https://static.ads-twitter.com https://scripts.demandbase.com https://tag.dem",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "SAMEORIGIN",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "permissions-policy": "geolocation=(), camera=(), microphone=()",
+            "cross-origin-opener-policy": "unsafe-none",
+            "cross-origin-resource-policy": "cross-origin",
+            "server": "cloudflare"
+          },
+          "cookies": [
+            {
+              "nome": "_ga",
+              "secure": false,
+              "httponly": false,
+              "samesite": null
+            },
+            {
+              "nome": "cfz_google-analytics_v4",
+              "secure": true,
+              "httponly": true,
+              "samesite": "Lax"
+            },
+            {
+              "nome": "cfz_adobe",
+              "secure": true,
+              "httponly": true,
+              "samesite": "Lax"
+            },
+            {
+              "nome": "kndctr_8AD56F28618A50850A495FB6_AdobeOrg_identity",
+              "secure": true,
+              "httponly": false,
+              "samesite": "Lax"
+            },
+            {
+              "nome": "__cf_bm",
+              "secure": true,
+              "httponly": true,
+              "samesite": "None"
+            }
+          ],
+          "hsts": {
+            "max_age_segundos": 31536000,
+            "max_age_dias": 365.0,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": true,
+            "preload": false
+          },
+          "csp": {
+            "n_diretivas": 14,
+            "tem_default_src": true,
+            "tem_frame_ancestors": true,
+            "tem_object_src": true,
+            "usa_unsafe_inline": true,
+            "usa_unsafe_eval": true,
+            "usa_nonce": false,
+            "usa_strict_dynamic": false
+          },
+          "csp_meta": null
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_256_GCM_SHA384",
+          "bits": 256,
+          "emissor": "Google Trust Services",
+          "expira_em": "2026-11-26",
+          "dias_para_expirar": 87,
+          "n_sans": 2
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 200,
+          "existe": true,
+          "conforme_rfc9116": true,
+          "campos": [
+            "canonical",
+            "contact",
+            "hiring",
+            "policy",
+            "preferred-languages"
+          ]
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "cloudflare.com",
+          "a": [
+            "104.16.123.96",
+            "104.16.124.96"
+          ],
+          "aaaa": [
+            "2606:4700::6810:7b60",
+            "2606:4700::6810:7c60"
+          ],
+          "mx": [
+            "10 mxa.global.inbound.cf-emailsecurity.net.",
+            "10 mxb.global.inbound.cf-emailsecurity.net.",
+            "5 mxa-canary.global.inbound.cf-emailsecurity.net.",
+            "5 mxb-canary.global.inbound.cf-emailsecurity.net."
+          ],
+          "caa": [
+            "0 iodef \"mailto:tls-abuse@cloudflare.com\"",
+            "0 issue \"comodoca.com\"",
+            "0 issue \"digicert.com; cansignhttpexchanges=yes\"",
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"pki.goog; cansignhttpexchanges=yes\"",
+            "0 issue \"ssl.com\"",
+            "0 issuewild \"comodoca.com\"",
+            "0 issuewild \"digicert.com; cansignhttpexchanges=yes\"",
+            "0 issuewild \"letsencrypt.org\"",
+            "0 issuewild \"pki.goog; cansignhttpexchanges=yes\"",
+            "0 issuewild \"ssl.com\""
+          ],
+          "spf": "\"v=spf1 ip4:199.15.212.0/22 ip4:173.245.48.0/20 include:_spf.google.com include:spf1.mcsv.net include:spf.mandrillapp.com include:mail.zendesk.com include:stspg-customer.com include:_spf.salesforce.com -all\"",
+          "dmarc": "\"v=DMARC1; p=reject; sp=reject; adkim=r; aspf=r; pct=100; rua=mailto:a1c47f179bc04efd8ee4dcd4d85dfc65@dmarc-reports.cloudflare.net,mailto:rua@cloudflare.com\"",
+          "n_txt": 28
+        },
+        {
+          "sonda": "transparencia_certificados",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 7.6,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "HSTS cobre subdomínios",
+            0.5
+          ],
+          [
+            "CSP no cabeçalho",
+            1.3
+          ],
+          [
+            "X-Content-Type-Options: nosniff",
+            1.0
+          ],
+          [
+            "Enquadramento restrito",
+            1.0
+          ],
+          [
+            "Referrer-Policy restritiva",
+            1.0
+          ],
+          [
+            "Permissions-Policy",
+            0.5
+          ],
+          [
+            "COOP",
+            0.5
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": [
+          [
+            "cookie _ga sem Secure",
+            -0.4
+          ],
+          [
+            "cookie _ga sem HttpOnly",
+            -0.3
+          ]
+        ]
+      },
+      "impressao": "a21324299872e939"
+    },
+    {
+      "alvo": "owasp.org",
+      "classe": "referencia",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://owasp.org/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [
+            "content-security-policy"
+          ],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=31536000; includeSubDomains",
+            "content-security-policy": "default-src 'self' https://*.fontawesome.com https://api.github.com https://*.githubusercontent.com https://*.google-analytics.com https://owaspadmin.azurewebsites.net https://*.twimg.com https://platform.twitter.com https://www.youtube.com https://*.doubleclick.net; frame-ancestors 'self'; frame-src https://*.vuejs.org https://*.stripe.com https://*.wufoo.com https://*.sched.com https://*.google.com https://*.twitter.com https://www.youtube.com https://w.soundcloud.com https://buttons.github.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://viewer.diagrams.net https://fonts.googleap",
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "SAMEORIGIN",
+            "referrer-policy": "same-origin",
+            "permissions-policy": "geolocation=(self)",
+            "server": "cloudflare"
+          },
+          "cookies": [],
+          "hsts": {
+            "max_age_segundos": 31536000,
+            "max_age_dias": 365.0,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": true,
+            "preload": false
+          },
+          "csp": {
+            "n_diretivas": 8,
+            "tem_default_src": true,
+            "tem_frame_ancestors": true,
+            "tem_object_src": false,
+            "usa_unsafe_inline": true,
+            "usa_unsafe_eval": true,
+            "usa_nonce": false,
+            "usa_strict_dynamic": false
+          },
+          "csp_meta": null
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_256_GCM_SHA384",
+          "bits": 256,
+          "emissor": "Google Trust Services",
+          "expira_em": "2026-10-06",
+          "dias_para_expirar": 36,
+          "n_sans": 2
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 200,
+          "existe": true,
+          "conforme_rfc9116": true,
+          "campos": [
+            "contact",
+            "expires"
+          ]
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "owasp.org",
+          "a": [
+            "104.20.44.163",
+            "172.66.157.115"
+          ],
+          "aaaa": [
+            "2606:4700:10::6814:2ca3",
+            "2606:4700:10::ac42:9d73"
+          ],
+          "mx": [
+            "1 aspmx.l.google.com.",
+            "10 alt3.aspmx.l.google.com.",
+            "10 alt4.aspmx.l.google.com.",
+            "5 alt1.aspmx.l.google.com.",
+            "5 alt2.aspmx.l.google.com."
+          ],
+          "caa": [],
+          "spf": "\"v=spf1 include:_spf.google.com include:servers.mcsv.net include:amazonses.com -all\"",
+          "dmarc": "\"v=DMARC1; p=quarantine; rua=mailto:88b4c392605549efbbfedf60d5b5ba94@dmarc-reports.cloudflare.net,mailto:owasp-dmarc-reports@owasp.com\"",
+          "n_txt": 10
+        },
+        {
+          "sonda": "transparencia_certificados",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 7.8,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "HSTS cobre subdomínios",
+            0.5
+          ],
+          [
+            "CSP no cabeçalho",
+            1.3
+          ],
+          [
+            "X-Content-Type-Options: nosniff",
+            1.0
+          ],
+          [
+            "Enquadramento restrito",
+            1.0
+          ],
+          [
+            "Referrer-Policy restritiva",
+            1.0
+          ],
+          [
+            "Permissions-Policy",
+            0.5
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": []
+      },
+      "impressao": "38820e8ee6181cf7"
+    },
+    {
+      "alvo": "web.dev",
+      "classe": "referencia",
+      "sondas": [
+        {
+          "sonda": "porta80",
+          "status": "ok",
+          "codigo": 301,
+          "destino": "https://web.dev/",
+          "sobe_para_https": true,
+          "redireciona": true
+        },
+        {
+          "sonda": "cabecalhos",
+          "status": "ok",
+          "truncado_para_exibicao": [],
+          "codigo": 200,
+          "cabecalhos": {
+            "strict-transport-security": "max-age=63072000; includeSubdomains; preload",
+            "content-security-policy": "base-uri 'self'; object-src 'none'; script-src 'strict-dynamic' 'unsafe-inline' https: http: 'nonce-esULMPE1GdhrXIjhxi3oPdNsCszLPT' 'unsafe-eval'; frame-ancestors 'self' https://developers.google.com/_d/analytics-iframe; report-uri https://csp.withgoogle.com/csp/devsite/v2",
+            "x-content-type-options": "nosniff",
+            "server": "Google Frontend"
+          },
+          "cookies": [],
+          "hsts": {
+            "max_age_segundos": 63072000,
+            "max_age_dias": 730.0,
+            "valido": true,
+            "desligado": false,
+            "include_subdomains": true,
+            "preload": true
+          },
+          "csp": {
+            "n_diretivas": 5,
+            "tem_default_src": false,
+            "tem_frame_ancestors": true,
+            "tem_object_src": true,
+            "usa_unsafe_inline": true,
+            "usa_unsafe_eval": true,
+            "usa_nonce": true,
+            "usa_strict_dynamic": true
+          },
+          "csp_meta": null
+        },
+        {
+          "sonda": "tls",
+          "status": "ok",
+          "versao": "TLSv1.3",
+          "cifra": "TLS_AES_256_GCM_SHA384",
+          "bits": 256,
+          "emissor": "Google Trust Services",
+          "expira_em": "2026-11-02",
+          "dias_para_expirar": 64,
+          "n_sans": 77
+        },
+        {
+          "sonda": "security_txt",
+          "status": "ok",
+          "codigo": 404,
+          "existe": false,
+          "conforme_rfc9116": false,
+          "campos": []
+        },
+        {
+          "sonda": "dns",
+          "status": "ok",
+          "dominio_raiz": "web.dev",
+          "a": [
+            "216.239.32.27"
+          ],
+          "aaaa": [
+            "2001:4860:4802:32::1b"
+          ],
+          "mx": [],
+          "caa": [
+            "0 issue \"letsencrypt.org\"",
+            "0 issue \"pki.goog\""
+          ],
+          "spf": null,
+          "dmarc": null,
+          "n_txt": 1
+        },
+        {
+          "sonda": "transparencia_certificados",
+          "status": "pulada",
+          "motivo": "sonda diária: roda só na coleta completa, para não martelar um serviço comunitário gratuito de hora em hora"
+        }
+      ],
+      "postura": {
+        "nota": 6.3,
+        "ganhos": [
+          [
+            "HSTS com max-age >= 180 dias",
+            1.5
+          ],
+          [
+            "HSTS cobre subdomínios",
+            0.5
+          ],
+          [
+            "CSP no cabeçalho",
+            1.3
+          ],
+          [
+            "X-Content-Type-Options: nosniff",
+            1.0
+          ],
+          [
+            "Enquadramento restrito",
+            1.0
+          ],
+          [
+            ":80 sobe para HTTPS",
+            1.0
+          ]
+        ],
+        "perdas": []
+      },
+      "impressao": "36c7cd22eae776a9"
+    }
+  ],
+  "completa": false,
+  "mudaram": [
+    "github.com",
+    "www.mozilla.org"
+  ]
+}
