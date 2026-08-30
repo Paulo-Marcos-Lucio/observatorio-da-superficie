@@ -9,9 +9,9 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-08-30T00:24:43+00:00 · **332 coletas** na série (de hora em hora) · **327 instantâneos** guardados
+**Última coleta:** 2026-08-30T02:35:09+00:00 · **333 coletas** na série (de hora em hora) · **328 instantâneos** guardados
 
-O quadro abaixo é do instantâneo de `2026-08-30T00:24:43+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
+O quadro abaixo é do instantâneo de `2026-08-30T02:35:09+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
 cabeçalhos inteiros só é guardado quando alguma coisa muda — a série
 registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora
 seriam 193 MB por ano de histórico para dizer que nada aconteceu.
@@ -22,7 +22,7 @@ seriam 193 MB por ano de histórico para dizer que nada aconteceu.
 |---|---|---|---|---|---|---|---|---|---|
 | `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 62d |
 | `owasp.org` | referencia | **7.8** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 37d |
-| `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 88d |
+| `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 87d |
 | `github.com` | referencia | **7.5** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 31d |
 | `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 82d |
 | `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 64d |
@@ -47,6 +47,7 @@ barrando nada.
 
 Dias em que a superfície observada mudou:
 
+- [2026-08-30](diario/2026-08-30.md)
 - [2026-08-29](diario/2026-08-29.md)
 - [2026-08-28](diario/2026-08-28.md)
 - [2026-08-27](diario/2026-08-27.md)
@@ -56,7 +57,6 @@ Dias em que a superfície observada mudou:
 - [2026-08-23](diario/2026-08-23.md)
 - [2026-08-22](diario/2026-08-22.md)
 - [2026-08-21](diario/2026-08-21.md)
-- [2026-08-20](diario/2026-08-20.md)
 
 ## Como isto funciona
 
