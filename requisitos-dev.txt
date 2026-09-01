@@ -3,4 +3,4 @@
 # Estas dependências existem só para desenvolver e testar.
 pytest==9.1.1
 hypothesis==6.165.10
-ruff==0.16.4
+ruff==0.16.5
