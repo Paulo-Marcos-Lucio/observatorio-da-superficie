@@ -657,6 +657,7 @@ def sondar_dns(alvo: str) -> dict[str, Any]:
         "a": consultar(alvo, "A"),
         "aaaa": consultar(alvo, "AAAA"),
         "mx": consultar(raiz, "MX"),
+        "ns": consultar(raiz, "NS"),
         "caa": consultar(raiz, "CAA"),
         "spf": next((t for t in txt if "v=spf1" in t.lower()), None),
         "dmarc": next((t for t in dmarc if "v=dmarc1" in t.lower()), None),
@@ -955,13 +956,57 @@ def observar(alvo: dict[str, str], completa: bool = False) -> dict[str, Any]:
 # instantâneo novo.
 _VOLATEIS = {"dias_para_expirar", "motivo", "n_certificados_validos", "n_emitidos_7d"}
 
+# Os cinco tipos de registro DNS que a sonda `dns` devolve como lista. O
+# resolvedor já entrega cada um ordenado (ver `consultar` em `sondar_dns`),
+# mas a impressão reordena de novo aqui, defensivamente: a garantia de "compara
+# o CONJUNTO, não a ordem de chegada" precisa valer mesmo que um tipo novo
+# entre nesta lista sem que quem o escreveu lembre de ordenar na origem.
+_CAMPOS_DNS_EM_LISTA = ("a", "aaaa", "mx", "ns", "caa")
+
+# A e AAAA, e só eles, rotacionam por amostragem: github.com tem um pool de 11
+# endereços, e uma única consulta DoH devolve UM deles, sorteado a cada vez —
+# medido em produção, 40 coletas seguidas trouxeram 40 endereços A diferentes.
+# Não existe "conjunto ordenado" que estabilize isso: a amostra de cada coleta
+# é, ela mesma, um elemento só, e comparar amostra-de-1 contra amostra-de-1
+# está estatisticamente fadado a diferir quase sempre — foi o segundo maior
+# gerador de falso "mudou" da série, atrás só da CSP da Mozilla (CAMPO-12).
+#
+# MX, NS e CAA não têm essa doença: são poucos, estáveis, e o resolvedor
+# devolve o conjunto inteiro a cada consulta — mudança ali é configuração de
+# verdade, em qualquer classe de alvo, e continua contando para a impressão.
+#
+# A saída: fora de alvo próprio, A/AAAA entram na série (o valor amostrado
+# fica gravado quando um instantâneo é escrito por outro motivo) mas não
+# participam da impressão — a mesma doutrina que `painel._mudanca_de_endereco`
+# já aplica ao diário, agora também na decisão de gravar instantâneo. Em alvo
+# próprio o endereço continua contando: é o único caso em que uma migração de
+# DNS é sinal que o operador precisa ver, não ruído de rodízio.
+_CAMPOS_DNS_ROTATIVOS = {"a", "aaaa"}
+
+
+def _normalizar_dns_para_impressao(classe: str, sonda: dict[str, Any]) -> dict[str, Any]:
+    """Prepara a sonda `dns` para a impressão: ordena os conjuntos e, fora de
+    alvo próprio, tira A/AAAA da conta — ver `_CAMPOS_DNS_ROTATIVOS`."""
+    if sonda.get("sonda") != "dns" or sonda.get("status") != "ok":
+        return sonda
+
+    normalizada = dict(sonda)
+    for campo in _CAMPOS_DNS_EM_LISTA:
+        if isinstance(normalizada.get(campo), list):
+            normalizada[campo] = sorted(normalizada[campo])
+    if classe != "proprio":
+        for campo in _CAMPOS_DNS_ROTATIVOS:
+            normalizada.pop(campo, None)
+    return normalizada
+
 
 def _impressao(observacao: dict[str, Any]) -> str:
     """Impressão digital estável da observação.
 
     Serve para responder "isto é igual à última vez?" sem se deixar enganar
-    por nonce de CSP que rotaciona a cada resposta nem por um contador de dias
-    até o certificado expirar, que cai sozinho todo dia.
+    por nonce de CSP que rotaciona a cada resposta, por um contador de dias
+    até o certificado expirar que cai sozinho todo dia, ou pelo rodízio de
+    endereço A/AAAA de um alvo atrás de anycast/CDN (ver `_CAMPOS_DNS_ROTATIVOS`).
     """
 
     def limpar(valor: Any) -> Any:
@@ -973,7 +1018,13 @@ def _impressao(observacao: dict[str, Any]) -> str:
             return re.sub(r"'nonce-[A-Za-z0-9+/=_-]+'", "'nonce-…'", valor)
         return valor
 
-    estavel = limpar([s for s in observacao["sondas"] if s["status"] != "pulada"])
+    classe = observacao.get("classe", "referencia")
+    sondas = [
+        _normalizar_dns_para_impressao(classe, s)
+        for s in observacao["sondas"]
+        if s["status"] != "pulada"
+    ]
+    estavel = limpar(sondas)
     return hashlib.sha256(
         json.dumps(estavel, ensure_ascii=False, sort_keys=True).encode()
     ).hexdigest()[:16]

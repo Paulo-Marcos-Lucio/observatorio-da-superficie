@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hypothesis import given, settings
@@ -857,6 +858,125 @@ def test_cabecalho_nao_ascii_e_barrado_antes_da_rede(sujo: str):
             tentativas=1,
             cabecalhos_extra={"X-Teste": sujo},
         )
+
+
+# --------------------------------------------------------------------------
+# 11. Amostra de rodízio de DNS não é "mudou" (CAMPO-12)
+# --------------------------------------------------------------------------
+#
+# Medido em produção: 40 coletas seguidas de github.com trouxeram 40 endereços
+# A diferentes — um pool de rodízio de 11 endereços, uma amostra por consulta
+# DoH. Era o segundo maior gerador de falso "mudou" da série, atrás só da CSP
+# da Mozilla: a impressão hasheava a amostra bruta, então cada rodízio virava
+# instantâneo gravado com o alvo errado apontado como alterado — mesma classe
+# do `[:8]` sobre CAA já corrigido em 11/08, agora na impressão em vez do
+# diário. O `PRONTO QUANDO` do item trava as cinco famílias de registro que a
+# sonda `dns` devolve como lista — A, AAAA, MX, NS, CAA — de uma vez.
+
+
+def _obs_dns(classe: str, **campos_dns: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "caa": [],
+        "spf": None,
+        "dmarc": None,
+        "dominio_raiz": "x.test",
+        "n_txt": 0,
+    }
+    base.update(campos_dns)
+    return {
+        "alvo": "x",
+        "classe": classe,
+        "sondas": [{"sonda": "dns", "status": "ok", **base}],
+    }
+
+
+@given(
+    antes=st.text(alphabet="0123456789.", min_size=7, max_size=15),
+    agora=st.text(alphabet="0123456789.", min_size=7, max_size=15),
+)
+def test_rodizio_de_a_nao_aciona_instantaneo_fora_de_alvo_proprio(antes, agora):
+    """Uma amostra de 1 endereço, sorteada a cada consulta, não pode acionar
+    gravação de instantâneo em alvo de referência — é a mesma amostragem que
+    produziu 40 endereços A diferentes em 40 coletas seguidas de github.com."""
+    impressao_antes = coleta._impressao(_obs_dns("referencia", a=[antes]))
+    impressao_agora = coleta._impressao(_obs_dns("referencia", a=[agora]))
+
+    assert impressao_antes == impressao_agora
+
+
+@given(
+    antes=st.lists(
+        st.text(alphabet="0123456789.abcdef:", min_size=7, max_size=20),
+        min_size=1,
+        max_size=3,
+        unique=True,
+    ),
+    agora=st.lists(
+        st.text(alphabet="0123456789.abcdef:", min_size=7, max_size=20),
+        min_size=1,
+        max_size=3,
+        unique=True,
+    ),
+)
+def test_rodizio_de_aaaa_tambem_nao_aciona_instantaneo_fora_de_alvo_proprio(antes, agora):
+    """O dual do teste de A: AAAA sofre o mesmo rodízio e precisa da mesma
+    tolerância fora de alvo próprio."""
+    impressao_antes = coleta._impressao(_obs_dns("referencia", aaaa=antes))
+    impressao_agora = coleta._impressao(_obs_dns("referencia", aaaa=agora))
+
+    assert impressao_antes == impressao_agora
+
+
+def test_alvo_proprio_continua_vendo_migracao_de_endereco():
+    """A supressão de ruído acima não pode apagar o sinal que a doutrina de
+    alvo próprio já garante no diário (`painel._mudanca_de_endereco`): aqui a
+    troca de A é exatamente o que o observatório existe para avisar."""
+    impressao_antes = coleta._impressao(_obs_dns("proprio", a=["1.1.1.1"]))
+    impressao_agora = coleta._impressao(_obs_dns("proprio", a=["9.9.9.9"]))
+
+    assert impressao_antes != impressao_agora
+
+
+@given(
+    campo=st.sampled_from(["mx", "ns", "caa"]),
+    classe=st.sampled_from(["proprio", "referencia"]),
+)
+def test_mudanca_de_mx_ns_ou_caa_sempre_aciona_instantaneo(campo, classe):
+    """MX, NS e CAA não rotacionam — o resolvedor devolve o conjunto inteiro a
+    cada consulta, então uma mudança aqui é configuração de verdade, em
+    qualquer classe de alvo, e precisa continuar acionando o instantâneo."""
+    impressao_antes = coleta._impressao(_obs_dns(classe, **{campo: ["valor-a.test"]}))
+    impressao_agora = coleta._impressao(_obs_dns(classe, **{campo: ["valor-b.test"]}))
+
+    assert impressao_antes != impressao_agora
+
+
+@given(
+    campo=st.sampled_from(["a", "aaaa", "mx", "ns", "caa"]),
+    valores=st.lists(
+        st.text(alphabet="abcdefghij0123456789", min_size=3, max_size=8),
+        min_size=2,
+        max_size=5,
+        unique=True,
+    ),
+)
+def test_reordenar_registro_dns_nao_aciona_instantaneo(campo, valores):
+    """A comparação é sobre o CONJUNTO ordenado, não sobre a ordem de chegada:
+    embaralhar a mesma lista não pode virar 'mudou' em nenhuma das cinco
+    famílias travadas por este item — A, AAAA, MX, NS e CAA de uma vez. Usa
+    classe `proprio` de propósito: é o caso em que A/AAAA continuam contando
+    para a impressão, então é onde a garantia de ordem precisa se sustentar
+    sozinha, sem a supressão de rodízio ajudando por baixo."""
+    embaralhada = list(reversed(valores))
+
+    impressao_antes = coleta._impressao(_obs_dns("proprio", **{campo: valores}))
+    impressao_agora = coleta._impressao(_obs_dns("proprio", **{campo: embaralhada}))
+
+    assert impressao_antes == impressao_agora
 
 
 if __name__ == "__main__":
