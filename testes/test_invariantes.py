@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hypothesis import given, settings
@@ -857,6 +858,102 @@ def test_cabecalho_nao_ascii_e_barrado_antes_da_rede(sujo: str):
             tentativas=1,
             cabecalhos_extra={"X-Teste": sujo},
         )
+
+
+# --------------------------------------------------------------------------
+# 11. Instantâneo parcial não é "alvo saiu"/"alvo novo" (CAMPO-11)
+# --------------------------------------------------------------------------
+#
+# Em 2026-08-12, duas execuções locais com `--host` gravaram um instantâneo
+# com 2 dos 6 alvos na mesma série append-only das coletas de produção. O
+# diário comparou esse instantâneo contra os completos dos dois lados e
+# publicou oito afirmações falsas — quatro alvos "saindo" e, seis linhas
+# abaixo, os mesmos quatro "voltando" como alvo novo — sobre organizações de
+# terceiros, num repositório público. A retratação está publicada embaixo
+# das entradas erradas em `diario/2026-08-12.md`; estes testes travam a
+# classe do defeito na origem, para que um novo `--host` local não produza a
+# mesma história outra vez.
+
+
+@given(
+    n_observacoes=st.integers(min_value=0, max_value=10),
+    esperados=st.integers(min_value=0, max_value=10),
+)
+def test_instantaneo_parcial_e_reconhecido_por_contagem(n_observacoes, esperados):
+    """A regra é puramente aritmética: menos alvos do que `alvos.yml`
+    declara agora é parcial; igual ou mais não é.
+
+    `esperados == 0` (arquivo ilegível ou vazio) desliga o filtro em vez de
+    descartar a série inteira — falha aberta, não fechada.
+    """
+    parcial = painel._instantaneo_e_parcial(n_observacoes, esperados)
+
+    if esperados == 0:
+        assert parcial is False
+    else:
+        assert parcial == (n_observacoes < esperados)
+
+
+def _coleta_com(momento: str, alvos: list[str]) -> dict[str, Any]:
+    return {
+        "coletado_em": momento,
+        "observacoes": [{"alvo": alvo, "classe": "referencia", "sondas": []} for alvo in alvos],
+    }
+
+
+def test_sem_parciais_tira_o_instantaneo_com_menos_alvos():
+    completos = ["a.test", "b.test", "c.test", "d.test"]
+    parcial = ["a.test", "b.test"]
+
+    historico = [
+        ("t1", _coleta_com("t1", completos)),
+        ("t2", _coleta_com("t2", parcial)),
+        ("t3", _coleta_com("t3", completos)),
+    ]
+
+    filtrado = painel._sem_parciais(historico, esperados=len(completos))
+
+    assert [nome for nome, _ in filtrado] == ["t1", "t3"]
+
+
+def test_instantaneo_parcial_nao_gera_entrada_ou_saida_no_diario():
+    """O dual comportamental do teste acima: a mesma sequência que produziu
+    as oito afirmações falsas de 2026-08-12 não pode mais produzi-las depois
+    que `coletas()` (via `_sem_parciais`) tira o parcial do meio."""
+    completos = ["github.com", "owasp.org", "www.cloudflare.com", "www.mozilla.org"]
+    parcial = ["www.mozilla.org"]
+
+    historico = [
+        ("antes", _coleta_com("antes", completos)),
+        ("parcial", _coleta_com("parcial", parcial)),
+        ("depois", _coleta_com("depois", completos)),
+    ]
+
+    filtrado = painel._sem_parciais(historico, esperados=len(completos))
+    assert [nome for nome, _ in filtrado] == ["antes", "depois"]
+
+    diario = painel.gerar_diario(filtrado[0][1], filtrado[1][1])
+
+    assert diario is None, (
+        "nenhum alvo mudou entre as duas coletas completas — o instantâneo "
+        "parcial no meio não pode reaparecer como diferença"
+    )
+
+
+def test_sem_o_filtro_o_historico_bruto_reproduziria_o_erro_de_2026_08_12():
+    """Não é comportamento novo sendo testado — é o defeito original,
+    documentado em execução: comparar os instantâneos brutos, sem passar por
+    `_sem_parciais`, é exatamente o que gerou as oito afirmações falsas."""
+    completos = ["github.com", "owasp.org", "www.cloudflare.com", "www.mozilla.org"]
+    parcial = ["www.mozilla.org"]
+
+    antes = _coleta_com("antes", completos)
+    meio = _coleta_com("parcial", parcial)
+
+    diario = painel.gerar_diario(antes, meio)
+
+    assert diario is not None
+    assert "saiu da lista de observação" in diario[1]
 
 
 if __name__ == "__main__":
