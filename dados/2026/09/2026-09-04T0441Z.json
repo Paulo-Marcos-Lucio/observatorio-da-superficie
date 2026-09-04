@@ -1,5 +1,5 @@
 {
-  "coletado_em": "2026-09-04T04:41:11+00:00",
+  "coletado_em": "2026-09-04T04:41:41+00:00",
   "versao_coletor": "1.0",
   "observacoes": [
     {
@@ -223,7 +223,7 @@
           "status": "ok",
           "dominio_raiz": "github.com",
           "a": [
-            "140.82.114.3"
+            "140.82.113.4"
           ],
           "aaaa": [],
           "mx": [
@@ -287,7 +287,7 @@
           ]
         ]
       },
-      "impressao": "bc0909a93f83e4bf"
+      "impressao": "7af008de2b883b4f"
     },
     {
       "alvo": "www.mozilla.org",
@@ -311,8 +311,8 @@
           "codigo": 200,
           "cabecalhos": {
             "strict-transport-security": "max-age=31536000",
-            "content-security-policy": "frame-src 'self' accounts.firefox.com gtm.mozilla.org js.stripe.com www.google-analytics.com www.googletagmanager.com www.youtube.com; style-src 'self' 'unsafe-inline' cdn.transcend.io transcend-cdn.com www.mozilla.org; upgrade-insecure-requests; img-src 'self' blog.mozilla.org data: images.ctfassets.net www.google-analytics.com www.googletagmanager.com www.mozilla.org; media-src 'self' assets.mozilla.net videos.cdn.mozilla.net www.mozilla.org; form-action 'self' https://abdri3ttkb.execute-api.us-east-2.amazonaws.com https://accounts.firefox.com/ https://basket.mozilla.org; default-src 'self' ",
-            "content-security-policy-report-only": "frame-src 'self' accounts.firefox.com gtm.mozilla.org js.stripe.com www.google-analytics.com www.googletagmanager.com www.youtube.com; style-src 'self' 'unsafe-inline' cdn.transcend.io transcend-cdn.com www.mozilla.org; upgrade-insecure-requests; img-src 'self' blog.mozilla.org data: images.ctfassets.net www.google-analytics.com www.googletagmanager.com www.mozilla.org; media-src 'self' assets.mozilla.net videos.cdn.mozilla.net www.mozilla.org; form-action 'self' https://abdri3ttkb.execute-api.us-east-2.amazonaws.com https://accounts.firefox.com/ https://basket.mozilla.org; default-src 'self' ",
+            "content-security-policy": "style-src 'self' 'unsafe-inline' cdn.transcend.io transcend-cdn.com www.mozilla.org; upgrade-insecure-requests; frame-src 'self' accounts.firefox.com gtm.mozilla.org js.stripe.com www.google-analytics.com www.googletagmanager.com www.youtube.com; form-action 'self' https://abdri3ttkb.execute-api.us-east-2.amazonaws.com https://accounts.firefox.com/ https://basket.mozilla.org; object-src 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline' *.google-analytics.com *.googletagmanager.com cdn.transcend.io google-analytics.com googletagmanager.com js.stripe.com s.ytimg.com tagmanager.google.com t",
+            "content-security-policy-report-only": "style-src 'self' 'unsafe-inline' cdn.transcend.io transcend-cdn.com www.mozilla.org; upgrade-insecure-requests; frame-src 'self' accounts.firefox.com gtm.mozilla.org js.stripe.com www.google-analytics.com www.googletagmanager.com www.youtube.com; form-action 'self' https://abdri3ttkb.execute-api.us-east-2.amazonaws.com https://accounts.firefox.com/ https://basket.mozilla.org; object-src 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline' *.google-analytics.com *.googletagmanager.com cdn.transcend.io google-analytics.com googletagmanager.com js.stripe.com s.ytimg.com tagmanager.google.com t",
             "x-content-type-options": "nosniff",
             "x-frame-options": "DENY",
             "referrer-policy": "strict-origin-when-cross-origin",
@@ -444,7 +444,7 @@
         ],
         "perdas": []
       },
-      "impressao": "64a17275b1019419"
+      "impressao": "63f294721f4e0193"
     },
     {
       "alvo": "www.cloudflare.com",
@@ -807,7 +807,7 @@
           "codigo": 200,
           "cabecalhos": {
             "strict-transport-security": "max-age=63072000; includeSubdomains; preload",
-            "content-security-policy": "base-uri 'self'; object-src 'none'; script-src 'strict-dynamic' 'unsafe-inline' https: http: 'nonce-+pVGFnGz5/zYBgYBxuhWnDrblWM96m' 'unsafe-eval'; frame-ancestors 'self' https://developers.google.com/_d/analytics-iframe; report-uri https://csp.withgoogle.com/csp/devsite/v2",
+            "content-security-policy": "base-uri 'self'; object-src 'none'; script-src 'strict-dynamic' 'unsafe-inline' https: http: 'nonce-HyonOwl9XSMSV13DxTpuBKJfev8r2c' 'unsafe-eval'; frame-ancestors 'self' https://developers.google.com/_d/analytics-iframe; report-uri https://csp.withgoogle.com/csp/devsite/v2",
             "x-content-type-options": "nosniff",
             "server": "Google Frontend"
           },
@@ -911,11 +911,7 @@
   ],
   "completa": false,
   "mudaram": [
-    "paulo-marcos-lucio.github.io",
     "github.com",
-    "www.mozilla.org",
-    "www.cloudflare.com",
-    "owasp.org",
-    "web.dev"
+    "www.mozilla.org"
   ]
 }
