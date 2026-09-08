@@ -44,8 +44,20 @@ PADROES = [
     re.compile(rf"^(?P<chave>[A-Za-z0-9._-]+)\s*[=><~!]=+\s*v?{VERSAO}"),
     # "nome": "^1.2.3"  |  "nome": "~1.2.3"
     re.compile(rf'^"?(?P<chave>[@A-Za-z0-9._/-]+)"?\s*:\s*"[\^~>=<]*v?{VERSAO}'),
-    # <version>1.2.3</version>  (a chave vem do artifactId mais próximo, se houver)
-    re.compile(rf"^<version>v?{VERSAO}</version>"),
+    # <version>1.2.3</version>  e  <spring.version>6.0.0</spring.version>
+    #
+    # Duas formas em que o Maven declara versão. A tag `<version>` é a direta; a
+    # tag de PROPRIEDADE (`<qualquer.version>`) é a indireta — o pom guarda a
+    # versão numa propriedade e a referencia com `${qualquer.version}`, e é essa
+    # a linha que o diff troca num bump. O padrão antigo só casava `<version>`
+    # literal: um `<spring.version>5 -> 6` ficava INVISÍVEL (nem em `comuns`, nem
+    # em `orfas`) e um major escapava se houvesse outra linha legível não-major
+    # no mesmo diff. Casar `[\w.-]*version` fecha a classe inteira, não o exemplo.
+    # A chave é o nome da tag (`spring.version`), então propriedades distintas se
+    # comparam separadamente e `<version>` simples colapsa em `version` — o que
+    # importa é a chave ser a MESMA nos lados `-` e `+`. O retrovisor `(?P=chave)`
+    # exige que a tag de fechamento seja a mesma da de abertura.
+    re.compile(rf"^<(?P<chave>[\w.-]*version)>v?{VERSAO}</(?P=chave)>"),
     # uses: dono/acao@v3  |  uses: dono/acao@v3.1.0
     #
     # O `(?![\w.])` no fim não é enfeite. Com a minor opcional, um SHA que começa
@@ -80,7 +92,10 @@ PADROES = [
 SUSPEITAS = [
     re.compile(r"^uses:\s*[\w.-]+/[\w./-]+@"),
     re.compile(r"^[A-Za-z0-9._-]+\s*[=><~!]=+\s*\S"),
-    re.compile(r"^<version>.+</version>"),
+    # `<version>` e qualquer `<...version>` de propriedade Maven: se a versão não
+    # deu para ler (ex.: `<spring.version>${revision}</spring.version>`), a linha
+    # vira ILEGÍVEL em vez de invisível, e a mescla é recusada com o motivo.
+    re.compile(r"^<[\w.-]*version>.+</[\w.-]*version>"),
 ]
 
 # Constante, e não literal no ponto de uso, por um motivo mecânico: os seis

@@ -62,16 +62,44 @@ jobs:
             SHA=$(gh pr view "$NUMERO" -R "$REPO" --json headRefOid --jq .headRefOid)
 
             # --- 1. os checks terminaram? ---
-            PENDENTES=$(gh api "repos/${REPO}/commits/${SHA}/check-runs" \
-                          --jq '[.check_runs[] | select(.status!="completed")] | length')
+            # Uma página só (per_page=100) MAIS a prova de que ela conteve
+            # TODOS os checks. `gh api` sem `--paginate` traz só a primeira
+            # página — no padrão eram 30. Um commit com mais checks do que cabe
+            # na página escondia o resto: PENDENTES e ESTADOS enxergavam um
+            # subconjunto e o job podia mesclar no escuro achando tudo verde.
+            #
+            # O endpoint devolve `total_count` (o total do ref, não o da
+            # página). Se ele for maior que o que efetivamente lemos, não dá
+            # para afirmar que todos terminaram e passaram — e não medir todos
+            # os checks não é o mesmo que todos terem passado. Fail-closed:
+            # vai para revisão humana.
+            if ! CHECKS=$(gh api "repos/${REPO}/commits/${SHA}/check-runs?per_page=100"); then
+              echo "não foi possível ler os checks — não mescla no escuro"
+              echo "::endgroup::"
+              continue
+            fi
+
+            TOTAL=$(jq '.total_count // empty' <<<"$CHECKS")
+            LIDOS=$(jq '.check_runs | length' <<<"$CHECKS")
+            if [ -z "$TOTAL" ]; then
+              echo "resposta de check-runs sem total_count — não mescla no escuro"
+              echo "::endgroup::"
+              continue
+            fi
+            if [ "$TOTAL" -gt "$LIDOS" ]; then
+              echo "são ${TOTAL} checks e só li ${LIDOS} numa página — não mescla no escuro"
+              echo "::endgroup::"
+              continue
+            fi
+
+            PENDENTES=$(jq '[.check_runs[] | select(.status!="completed")] | length' <<<"$CHECKS")
             if [ "$PENDENTES" != "0" ]; then
               echo "ainda há ${PENDENTES} check(s) rodando — fica para amanhã"
               echo "::endgroup::"
               continue
             fi
 
-            ESTADOS=$(gh api "repos/${REPO}/commits/${SHA}/check-runs" \
-                        --jq '[.check_runs[] | .conclusion] | join(" ")')
+            ESTADOS=$(jq -r '[.check_runs[] | .conclusion] | join(" ")' <<<"$CHECKS")
             if [ -z "$ESTADOS" ]; then
               echo "nenhum check registrado — não mescla no escuro"
               echo "::endgroup::"

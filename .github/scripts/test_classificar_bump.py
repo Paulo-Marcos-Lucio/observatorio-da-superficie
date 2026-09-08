@@ -164,6 +164,43 @@ CASOS = [
         '-  "hypothesis>=6.165.0",\n+  "hypothesis>=6.165.2",\n',
         True,
     ),
+    # --- Versão declarada como PROPRIEDADE Maven (`<spring.version>`) ---------
+    #
+    # Terceira casca da mesma classe da tag simples e da aspa do pyproject. O
+    # pom não põe a versão só em `<version>`: o padrão comum é guardá-la numa
+    # propriedade (`<spring.version>5.0.0</spring.version>`) e referenciá-la com
+    # `${spring.version}`. O bump troca a linha da propriedade. O padrão antigo
+    # exigia a tag literal `<version>`, então `<spring.version>5 -> 6` era
+    # INVISÍVEL — não entrava em `comuns` nem em `orfas` — e bastava uma linha
+    # legível não-major ao lado para o job mesclar sozinho o major. O terceiro
+    # caso é o que importa: ao lado de um patch legível, o major em propriedade
+    # era aprovado.
+    (
+        "propriedade de versão Maven, minor sozinha",
+        "-    <spring.version>5.2.0</spring.version>\n"
+        "+    <spring.version>5.4.0</spring.version>\n",
+        True,
+    ),
+    (
+        "propriedade de versão Maven, major",
+        "-    <spring.version>5.0.0</spring.version>\n"
+        "+    <spring.version>6.0.0</spring.version>\n",
+        False,
+    ),
+    (
+        "FALHA ABERTA: patch legível ao lado de major em propriedade Maven",
+        "-hypothesis==6.122.1\n+hypothesis==6.165.0\n"
+        "-    <spring.version>5.0.0</spring.version>\n"
+        "+    <spring.version>6.0.0</spring.version>\n",
+        False,
+    ),
+    (
+        "propriedade Maven com versão ilegível não pode ser invisível",
+        "-hypothesis==6.122.1\n+hypothesis==6.165.0\n"
+        "-    <spring.version>${revision}</spring.version>\n"
+        "+    <spring.version>${next}</spring.version>\n",
+        False,
+    ),
 ]
 
 falhas = 0

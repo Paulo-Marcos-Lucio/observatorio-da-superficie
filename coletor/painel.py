@@ -89,6 +89,25 @@ def _mudanca_de_endereco(antes: list[str] | None, agora: list[str] | None) -> bo
     return not (antes_c & agora_c)
 
 
+def _csp_mudou(a_cab: dict[str, Any], b_cab: dict[str, Any]) -> bool | None:
+    """A política CSP mudou de fato, ignorando a ordem de serialização?
+
+    Compara a forma canônica que o coletor grava a partir do valor íntegro
+    (`{diretiva: tokens ordenados}`), não a string crua cortada em 600. Duas
+    serializações da mesma política — diretivas em outra ordem, tokens em outra
+    ordem, nonce diferente — têm a MESMA canônica e não são mudança.
+
+    Devolve `None` quando não há forma canônica dos dois lados (coleta de schema
+    antigo, anterior a este campo): aí quem chama decide o fail-closed, porque
+    não medir não é medir ausência.
+    """
+    canon_a = (a_cab.get("csp") or {}).get("canonica")
+    canon_b = (b_cab.get("csp") or {}).get("canonica")
+    if canon_a is None or canon_b is None:
+        return None
+    return canon_a != canon_b
+
+
 def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
     """Diferenças observáveis entre duas leituras do mesmo alvo.
 
@@ -132,6 +151,32 @@ def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
         for nome in sorted(set(antigos) - set(novos)):
             mudancas.append(f"**parou de enviar `{nome}`**")
         for nome in sorted(set(antigos) & set(novos)):
+            # A CSP não se compara pela string crua. A mesma política reaparece
+            # a cada resposta com as diretivas em outra ordem, e a string
+            # cortada em 600 ainda troca de conteúdo conforme o corte cai numa
+            # diretiva ou noutra — medido: quase toda coleta de mozilla.org
+            # acusava "a CSP mudou" sem que a política tivesse mexido. A
+            # comparação canônica (conjunto de tokens por diretiva, sobre o
+            # valor íntegro) faz reordenação parar de virar linha de diário;
+            # mudança real no conjunto de tokens continua virando.
+            if nome == "content-security-policy":
+                mudou = _csp_mudou(a_cab, b_cab)
+                if mudou is True:
+                    mudancas.append(
+                        "`content-security-policy` mudou de política "
+                        "(o conjunto de diretivas/tokens, não só a ordem)"
+                    )
+                elif mudou is None and _normalizar(antigos[nome]) != _normalizar(novos[nome]):
+                    # Coleta de schema antigo, sem a forma canônica gravada: sem
+                    # como comparar a política íntegra, cai no texto normalizado.
+                    # Fail-closed — pode acusar ruído de ordem uma vez na
+                    # transição, mas nunca esconde uma mudança real.
+                    mudancas.append(
+                        f"`{nome}` mudou de valor\n"
+                        f"  - antes: `{antigos[nome][:180]}`\n"
+                        f"  - agora: `{novos[nome][:180]}`"
+                    )
+                continue
             antes_n, agora_n = _normalizar(antigos[nome]), _normalizar(novos[nome])
             if antes_n != agora_n:
                 mudancas.append(

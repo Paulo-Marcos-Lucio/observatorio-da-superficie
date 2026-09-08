@@ -468,6 +468,53 @@ def _ler_hsts(valor: str | None) -> dict[str, Any] | None:
     }
 
 
+# Ruído da CSP que muda por resposta sem que a política tenha mudado: o nonce
+# rotaciona a cada resposta, o hash de subrecurso idem, e o endpoint de
+# report-uri/report-to costuma carregar identificador de sessão. Neutralizados
+# ANTES de canonizar, senão a forma canônica mudaria toda hora e o diário
+# voltaria a gritar. São os mesmos padrões que `painel._normalizar` aplica na
+# comparação — só que aqui, na origem, sobre o valor íntegro.
+_RUIDO_CSP = (
+    (re.compile(r"'nonce-[A-Za-z0-9+/=_-]+'"), "'nonce-…'"),
+    (re.compile(r"'sha(256|384|512)-[A-Za-z0-9+/=]+'"), "'sha…'"),
+)
+
+
+def _canonizar_csp(valores: list[str]) -> list[list[Any]]:
+    """Forma canônica da CSP, imune à SERIALIZAÇÃO, sobre o valor ÍNTEGRO.
+
+    O problema que isto resolve: a mesma política reaparece a cada resposta com
+    as diretivas em outra ordem (na série deste repositório, mozilla.org tem UM
+    conteúdo por diretiva e centenas de ordens distintas). Comparar a string
+    crua acusava "a CSP mudou" na quase totalidade das coletas — ruído puro. A
+    canônica quebra cada política em `{diretiva: conjunto de tokens}`, com
+    diretivas e tokens ORDENADOS, então qualquer reordenação colapsa na mesma
+    forma. `report-uri`/`report-to` viram só a marca de presença: o endereço é
+    ruído, a diretiva existir não.
+
+    Uma entrada por política (o navegador aplica TODAS as CSPs, de todos os
+    cabeçalhos), e a lista externa é ordenada para a ordem ENTRE cabeçalhos
+    também não contar. Calculada sobre o valor íntegro — nunca sobre a string
+    cortada em 600, que perde o final e faz a canonização mentir.
+    """
+    politicas: list[list[Any]] = []
+    for valor in valores:
+        if not valor:
+            continue
+        for padrao, marca in _RUIDO_CSP:
+            valor = padrao.sub(marca, valor)
+        diretivas: dict[str, set[str]] = {}
+        for pedaco in valor.split(";"):
+            partes = pedaco.split()
+            if not partes:
+                continue
+            nome = partes[0].lower()
+            tokens = {"…"} if nome in ("report-uri", "report-to") else set(partes[1:])
+            diretivas.setdefault(nome, set()).update(tokens)
+        politicas.append([[d, sorted(t)] for d, t in sorted(diretivas.items())])
+    return sorted(politicas)
+
+
 def _ler_csp_multipla(valores: list[str] | None) -> dict[str, Any] | None:
     """Lê CSP quando o cabeçalho aparece mais de uma vez.
 
@@ -489,6 +536,9 @@ def _ler_csp_multipla(valores: list[str] | None) -> dict[str, Any] | None:
     combinada = {
         "n_politicas": len(lidas),
         "n_diretivas": sum(p["n_diretivas"] for p in lidas),
+        # A forma canônica cobre TODAS as políticas: é ela que a comparação usa
+        # para não confundir reordenação com mudança de política.
+        "canonica": _canonizar_csp([v for v in valores if v]),
     }
     # Uma restrição vale se QUALQUER política a impõe (todas são aplicadas).
     for campo in (
@@ -525,6 +575,9 @@ def _ler_csp(valor: str | None) -> dict[str, Any] | None:
         "usa_unsafe_eval": "'unsafe-eval'" in texto,
         "usa_nonce": "'nonce-" in texto,
         "usa_strict_dynamic": "'strict-dynamic'" in texto,
+        # Forma canônica sobre o valor íntegro: é o que a comparação do diário
+        # olha, para reordenação de diretivas/tokens não virar linha de mudança.
+        "canonica": _canonizar_csp([valor]),
     }
 
 
