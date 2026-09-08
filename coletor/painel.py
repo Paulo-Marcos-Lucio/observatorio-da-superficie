@@ -187,8 +187,8 @@ def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
                         f"antes responde agora: `{a_dns.get(campo)}` → `{b_dns.get(campo)}`"
                     )
 
-        # MX e CAA não rotacionam: mudança aqui é decisão de configuração.
-        for campo, rotulo in (("mx", "MX"), ("caa", "CAA")):
+        # MX, NS e CAA não rotacionam: mudança aqui é decisão de configuração.
+        for campo, rotulo in (("mx", "MX"), ("ns", "NS"), ("caa", "CAA")):
             if sorted(a_dns.get(campo) or []) != sorted(b_dns.get(campo) or []):
                 mudancas.append(
                     f"registro {rotulo} mudou: `{a_dns.get(campo)}` → `{b_dns.get(campo)}`"
