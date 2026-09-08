@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -20,17 +21,60 @@ RAIZ = Path(__file__).resolve().parent.parent
 DADOS = RAIZ / "dados"
 DIARIO = RAIZ / "diario"
 
+# `coleta.py` mora no mesmo diretório. Quando este arquivo roda como script
+# (`python coletor/painel.py`, o jeito como o workflow e o operador o
+# invocam), o Python já põe `coletor/` no início do `sys.path` sozinho — mas
+# sob pytest não, e os testes deste repositório importam os dois módulos
+# depois de inserir o caminho manualmente. Repetir a inserção aqui torna o
+# import seguro nos dois casos, sem depender de quem importou primeiro.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import coleta  # noqa: E402
+
+
+def _instantaneo_e_parcial(n_observacoes: int, esperados: int) -> bool:
+    """Um instantâneo com menos alvos do que `alvos.yml` declara agora é
+    amostra de depuração (execução local com `--host`), não um estado do
+    mundo — ver `coletas`. `esperados == 0` (arquivo ilegível ou vazio)
+    desliga o filtro em vez de descartar a série inteira: falha aberta, não
+    fechada, porque perder um instantâneo real é pior que deixar passar um
+    parcial que este código não conseguiu reconhecer.
+    """
+    return esperados > 0 and n_observacoes < esperados
+
+
+def _sem_parciais(
+    historico: list[tuple[str, dict[str, Any]]], esperados: int
+) -> list[tuple[str, dict[str, Any]]]:
+    """Tira da lista os instantâneos parciais — ver `_instantaneo_e_parcial`."""
+    return [
+        (nome, c)
+        for nome, c in historico
+        if not _instantaneo_e_parcial(len(c.get("observacoes", [])), esperados)
+    ]
+
 
 def coletas() -> list[tuple[str, dict[str, Any]]]:
-    """Todas as coletas, da mais antiga para a mais nova."""
+    """Todas as coletas *completas*, da mais antiga para a mais nova.
+
+    Uma execução local com `--host` grava um instantâneo parcial na mesma
+    série append-only das coletas de produção. Em 2026-08-12 isso fez os
+    quatro alvos ausentes da amostra parecerem "saíram da lista de
+    observação" e, na coleta seguinte, "voltarem" como alvo novo — oito
+    afirmações falsas sobre organizações de terceiros, num repositório
+    público (CAMPO-11). Um instantâneo parcial serve para depurar; comparado
+    como se fosse um estado do mundo, ele inventa entrada e saída que nunca
+    houve. Ficar fora daqui vale tanto para o diário quanto para o README:
+    os dois partem desta mesma lista.
+    """
     arquivos = sorted(DADOS.glob("*/*/*.json"))
-    saida = []
+    bruto = []
     for arquivo in arquivos:
         try:
-            saida.append((arquivo.stem, json.loads(arquivo.read_text(encoding="utf-8"))))
+            bruto.append((arquivo.stem, json.loads(arquivo.read_text(encoding="utf-8"))))
         except json.JSONDecodeError:
             continue
-    return saida
+    esperados = len(coleta.ler_alvos(RAIZ / "alvos.yml"))
+    return _sem_parciais(bruto, esperados)
 
 
 def por_alvo(coleta: dict[str, Any]) -> dict[str, dict[str, Any]]:
