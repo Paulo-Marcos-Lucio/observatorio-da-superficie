@@ -9,9 +9,9 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-09-19T01:15:14+00:00 · **830 coletas** na série (de hora em hora) · **815 instantâneos** guardados
+**Última coleta:** 2026-09-19T05:58:28+00:00 · **831 coletas** na série (de hora em hora) · **816 instantâneos** guardados
 
-O quadro abaixo é do instantâneo de `2026-09-19T01:15:14+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
+O quadro abaixo é do instantâneo de `2026-09-19T05:58:28+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
 cabeçalhos inteiros só é guardado quando alguma coisa muda — a série
 registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora
 seriam 193 MB por ano de histórico para dizer que nada aconteceu.
@@ -21,10 +21,10 @@ seriam 193 MB por ano de histórico para dizer que nada aconteceu.
 | Alvo | Classe | Nota | HSTS | CSP | Enquadr. | nosniff | Referrer | security.txt | Cert. |
 |---|---|---|---|---|---|---|---|---|---|
 | `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 42d |
-| `owasp.org` | referencia | **7.8** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 81d |
+| `owasp.org` | referencia | **7.8** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 80d |
 | `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 87d |
 | `github.com` | referencia | **7.5** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 71d |
-| `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 62d |
+| `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ fora da RFC | 61d |
 | `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 69d |
 
 `·` significa **inconclusivo**: a sonda não conseguiu medir. Não é o mesmo que
@@ -47,6 +47,7 @@ barrando nada.
 
 Dias em que a superfície observada mudou:
 
+- [2026-09-19](diario/2026-09-19.md)
 - [2026-09-18](diario/2026-09-18.md)
 - [2026-09-17](diario/2026-09-17.md)
 - [2026-09-16](diario/2026-09-16.md)
@@ -56,7 +57,6 @@ Dias em que a superfície observada mudou:
 - [2026-09-12](diario/2026-09-12.md)
 - [2026-09-11](diario/2026-09-11.md)
 - [2026-09-10](diario/2026-09-10.md)
-- [2026-09-09](diario/2026-09-09.md)
 
 ## Como isto funciona
 
