@@ -9,9 +9,9 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-09-23T17:42:04+00:00 · **884 coletas** na série (de hora em hora) · **868 instantâneos** guardados
+**Última coleta:** 2026-09-23T18:42:20+00:00 · **885 coletas** na série (de hora em hora) · **869 instantâneos** guardados
 
-O quadro abaixo é do instantâneo de `2026-09-23T17:42:04+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
+O quadro abaixo é do instantâneo de `2026-09-23T18:42:20+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
 cabeçalhos inteiros só é guardado quando alguma coisa muda — a série
 registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora
 seriam 193 MB por ano de histórico para dizer que nada aconteceu.
@@ -25,7 +25,7 @@ seriam 193 MB por ano de histórico para dizer que nada aconteceu.
 | `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 82d |
 | `github.com` | referencia | **7.5** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 67d |
 | `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 57d |
-| `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 71d |
+| `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 64d |
 
 `·` significa **inconclusivo**: a sonda não conseguiu medir. Não é o mesmo que
 ausente, e este projeto nunca escreve um pelo outro.
