@@ -23,9 +23,13 @@ name: Coleta
 # histórico permanente só para dizer que nada aconteceu.
 on:
   schedule:
-    # De hora em hora, no minuto 23 — longe do :00, onde o mundo inteiro agenda
-    # e a fila do GitHub atrasa mais.
-    - cron: "23 * * * *"
+    # Três tentativas por hora (minutos 7, 27 e 47), longe das marcas cheias
+    # onde o mundo inteiro agenda e a fila do GitHub atrasa/descarta mais. O
+    # `schedule` do GitHub é best-effort e chega a derrubar o dia inteiro (em
+    # 28/09/2026 caiu de ~24 para 4 coletas). Três tentativas elevam a
+    # resiliência sem depender de gatilho externo; a "Guarda de cadência"
+    # abaixo mantém a série horária, encerrando a tentativa redundante.
+    - cron: "7,27,47 * * * *"
   workflow_dispatch:
     inputs:
       host:
@@ -52,7 +56,36 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Guarda de cadência
+        # As três tentativas horárias do `schedule` existem para sobreviver ao
+        # descarte do agendador do GitHub, não para triplicar a coleta. Se a
+        # última coleta tem menos de 45 min, esta tentativa encerra sem coletar:
+        # a série continua horária e o falso "houve mudança" não se multiplica.
+        #
+        # Fail-open: qualquer incerteza (sem histórico, data ilegível) resulta em
+        # COLETAR — a guarda só PODE pular, nunca impedir uma coleta devida. A
+        # coleta completa das 03h roda na primeira tentativa da janela; um
+        # disparo manual (workflow_dispatch) nunca é pulado.
+        id: guarda
+        env:
+          EVENTO: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+          pular=nao
+          if [ "$EVENTO" = "schedule" ]; then
+            ultimo=$(git log -1 --format=%ct 2>/dev/null || echo "")
+            if [ -n "$ultimo" ]; then
+              idade=$(( ( $(date -u +%s) - ultimo ) / 60 ))
+              if [ "$idade" -ge 0 ] && [ "$idade" -lt 45 ]; then
+                pular=sim
+                echo "::notice::última coleta há ${idade} min (<45) — tentativa redundante encerrada"
+              fi
+            fi
+          fi
+          echo "pular=$pular" >> "$GITHUB_OUTPUT"
+
       - name: Coletar
+        if: steps.guarda.outputs.pular != 'sim'
         # O input vai por ambiente, nunca por interpolação dentro do `run:`.
         # `${{ inputs.host }}` é substituído como TEXTO pelo runner antes de o
         # bash existir: um host como `x"; curl … | sh; #` viraria comando. É a
@@ -77,6 +110,7 @@ jobs:
           fi
 
       - name: Gerar painel e diário
+        if: steps.guarda.outputs.pular != 'sim'
         # A coleta parcial (--host) grava um instantâneo com um alvo só. Se ela
         # alimentasse o painel, o README público perderia os outros cinco
         # alvos e o diário registraria "alvo saiu da lista" cinco vezes, num
@@ -92,6 +126,7 @@ jobs:
           fi
 
       - name: Registrar
+        if: steps.guarda.outputs.pular != 'sim'
         run: |
           set -euo pipefail
 
