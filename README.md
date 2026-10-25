@@ -9,9 +9,9 @@ O que interessa é a deriva: o cabeçalho que sumiu numa migração, o certifica
 que passou a ser emitido por outro fornecedor, o subdomínio de homologação que
 apareceu num log de Transparência. Isso só aparece medindo todo dia e comparando.
 
-**Última coleta:** 2026-10-25T21:38:26+00:00 · **1222 coletas** na série (de hora em hora) · **1203 instantâneos** guardados
+**Última coleta:** 2026-10-25T23:32:54+00:00 · **1223 coletas** na série (de hora em hora) · **1204 instantâneos** guardados
 
-O quadro abaixo é do instantâneo de `2026-10-25T21:38:26+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
+O quadro abaixo é do instantâneo de `2026-10-25T23:32:54+00:00`, com 30/30 sondas conclusivas. Instantâneo com os
 cabeçalhos inteiros só é guardado quando alguma coisa muda — a série
 registra todas as horas, mas 23 KB de cabeçalhos idênticos por hora
 seriam 193 MB por ano de histórico para dizer que nada aconteceu.
@@ -22,10 +22,10 @@ seriam 193 MB por ano de histórico para dizer que nada aconteceu.
 |---|---|---|---|---|---|---|---|---|---|
 | `paulo-marcos-lucio.github.io` | proprio | **3.9** | ✅ | ⚠ meta | — | — | — | ✅ | 65d |
 | `owasp.org` | referencia | **7.8** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 44d |
-| `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 77d |
+| `www.cloudflare.com` | referencia | **7.6** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 76d |
 | `github.com` | referencia | **7.5** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 35d |
 | `www.mozilla.org` | referencia | **7.3** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 85d |
-| `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 56d |
+| `web.dev` | referencia | **6.3** | ✅ | ✅ | ✅ | ✅ | — | — | 65d |
 
 `·` significa **inconclusivo**: a sonda não conseguiu medir. Não é o mesmo que
 ausente, e este projeto nunca escreve um pelo outro.
