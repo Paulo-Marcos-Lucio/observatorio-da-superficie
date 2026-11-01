@@ -337,6 +337,11 @@ def sondar_cabecalhos(alvo: str) -> dict[str, Any]:
         # A análise sempre come o valor íntegro, nunca o cortado.
         "hsts": _ler_hsts(_primeiro(integros.get("strict-transport-security"))),
         "csp": _ler_csp_multipla(integros.get("content-security-policy")),
+        # Mesmo tratamento do cabeçalho de imposição: report-only embaralha a
+        # ordem de diretiva igual ao `content-security-policy` (medido em
+        # mozilla.org), e sem a forma canônica aqui o ruído de serialização
+        # some do `csp` mas continua inteiro no `csp_report_only`.
+        "csp_report_only": _ler_csp_multipla(integros.get("content-security-policy-report-only")),
         "csp_meta": csp_meta,
     }
 
@@ -1008,18 +1013,36 @@ def observar(alvo: dict[str, str], completa: bool = False) -> dict[str, Any]:
 # instantâneo novo.
 _VOLATEIS = {"dias_para_expirar", "motivo", "n_certificados_validos", "n_emitidos_7d"}
 
+# Nomes da família CSP dentro do mapa `cabecalhos` (o valor bruto, cortado em
+# 600, na ordem que o servidor embaralha a cada resposta — mozilla.org tem UMA
+# política e dezenas de serializações distintas). Esse texto é ruído puro de
+# ordenação, e a prova é medida: com ele na impressão, o instantâneo era
+# gravado em 98,5% das coletas (1257 de 1276), quando o próprio desenho diz
+# "só quando mudar". `csp`/`csp_report_only`, calculados sobre o valor ÍNTEGRO
+# e já ordenados por diretiva e token, dizem a mesma coisa sem o ruído — são
+# eles, não o texto bruto, que decidem se a impressão muda.
+_CABECALHOS_CSP = {"content-security-policy", "content-security-policy-report-only"}
+
 
 def _impressao(observacao: dict[str, Any]) -> str:
     """Impressão digital estável da observação.
 
     Serve para responder "isto é igual à última vez?" sem se deixar enganar
-    por nonce de CSP que rotaciona a cada resposta nem por um contador de dias
-    até o certificado expirar, que cai sozinho todo dia.
+    por nonce de CSP que rotaciona a cada resposta, por um contador de dias até
+    o certificado expirar, que cai sozinho todo dia, nem pela ordem de
+    diretiva/token da CSP, que o servidor embaralha a cada resposta sem que a
+    política tenha mudado.
     """
 
     def limpar(valor: Any) -> Any:
         if isinstance(valor, dict):
-            return {c: limpar(v) for c, v in sorted(valor.items()) if c not in _VOLATEIS}
+            limpo = {c: limpar(v) for c, v in sorted(valor.items()) if c not in _VOLATEIS}
+            cabecalhos = limpo.get("cabecalhos")
+            if isinstance(cabecalhos, dict):
+                limpo["cabecalhos"] = {
+                    nome: v for nome, v in cabecalhos.items() if nome not in _CABECALHOS_CSP
+                }
+            return limpo
         if isinstance(valor, list):
             return [limpar(v) for v in valor]
         if isinstance(valor, str):
