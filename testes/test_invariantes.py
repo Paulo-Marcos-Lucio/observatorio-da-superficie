@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import random
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -875,21 +876,52 @@ def test_cabecalho_nao_ascii_e_barrado_antes_da_rede(sujo: str):
 _DADOS = Path(__file__).resolve().parent.parent / "dados"
 
 
+def _arquivos_recentes(janela_dias: int = 21) -> list[Path]:
+    """Os instantâneos de `dados/` dentro de uma janela recente, em ordem.
+
+    Reconstruir "a política real" de um alvo pressupõe que ela está estável —
+    isso vale sobre o PRESENTE, não sobre toda a história do projeto.
+    www.mozilla.org de fato mudou o conjunto de origens de `connect-src`,
+    `script-src` e `style-src` (domínios `transcend` entrando e saindo) até
+    2026-10-06, visível na série real — mudança de verdade, não ruído de
+    truncamento, e nenhuma canonização deveria fingir o contrário. Sem a
+    janela, a reconstrução vê os dois conjuntos ao mesmo tempo e a premissa de
+    "uma política só" — que sustenta os testes desta seção — deixa de valer.
+    A janela não escolhe um dia à mão: corta a partir do instantâneo mais
+    recente, então continua valendo conforme a série cresce.
+    """
+    arquivos = sorted(_DADOS.glob("*/*/*.json")) if _DADOS.exists() else []
+    if not arquivos:
+        return []
+
+    def _data(arquivo: Path) -> datetime | None:
+        try:
+            return datetime.strptime(arquivo.stem, "%Y-%m-%dT%H%MZ")
+        except ValueError:
+            return None
+
+    datados = [(a, _data(a)) for a in arquivos]
+    datas = [d for _, d in datados if d is not None]
+    if not datas:
+        return arquivos
+    corte = max(datas) - timedelta(days=janela_dias)
+    return [a for a, d in datados if d is not None and d >= corte]
+
+
 def _reconstruir_mozilla() -> tuple[dict[str, list[str]], list[tuple[str, ...]]]:
-    """Reconstrói, da série real, a política de www.mozilla.org e as ordens vistas.
+    """Reconstrói, da série real recente, a política de www.mozilla.org e as ordens vistas.
 
     Devolve (política, ordens): `política` é `{diretiva: tokens ordenados}` e
     `ordens` é a lista cronológica das ordens de diretiva observadas (o prefixo
     legível de cada coleta; a última diretiva de um valor cortado em 600 é
     descartada porque pode estar truncada). O coletor de então só guardava a
     string cortada — a política íntegra é remontada da UNIÃO dos fragmentos,
-    válida justamente porque cada diretiva tem um único conteúdo na série.
+    válida justamente porque, dentro da janela recente, cada diretiva tem um
+    único conteúdo na série (ver `_arquivos_recentes`).
     """
     por_diretiva: dict[str, set[str]] = {}
     ordens: list[tuple[str, ...]] = []
-    if not _DADOS.exists():
-        return {}, []
-    for arquivo in sorted(_DADOS.glob("*/*/*.json")):
+    for arquivo in _arquivos_recentes():
         try:
             coletado = json.loads(arquivo.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -966,14 +998,18 @@ def _diario_acusa_csp(mudancas: list[str]) -> bool:
 def test_serie_real_de_mozilla_tem_uma_politica_so():
     """Premissa empírica do CAMPO-07: uma política, muitas serializações.
 
-    Se um dia esta invariante quebrar (uma diretiva passar a ter dois conteúdos
-    reais na série), não é ruído de ordem — é mudança de verdade, e os testes
-    abaixo, que remontam a política da união dos fragmentos, deixariam de valer.
+    Vale sobre a janela recente de `_arquivos_recentes` — ver o porquê lá: a
+    série INTEIRA já viu mozilla.org mudar de verdade o conjunto de origens de
+    `connect-src`/`script-src`/`style-src` até 2026-10-06, e isso não é o que
+    este teste prende. Se esta invariante quebrar DENTRO da janela recente
+    (uma diretiva com dois conteúdos reais ao mesmo tempo), não é ruído de
+    ordem — é mudança de verdade, e os testes abaixo, que remontam a política
+    da união dos fragmentos, deixariam de valer.
     """
     if not _ORDENS_MOZ:
         pytest.skip("sem coletas de www.mozilla.org em dados/")
     por_diretiva: dict[str, set[tuple[str, ...]]] = {}
-    for arquivo in sorted(_DADOS.glob("*/*/*.json")):
+    for arquivo in _arquivos_recentes():
         try:
             coletado = json.loads(arquivo.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -1089,6 +1125,114 @@ def test_csp_rotacao_de_nonce_nao_muda_a_canonica():
     real = coleta._ler_csp("script-src 'nonce-XXXX'; object-src 'self' 'unsafe-inline'")
     assert real is not None
     assert real["canonica"] != a["canonica"]
+
+
+# --------------------------------------------------------------------------
+# 11. Piso de conclusividade: coleta inteiramente ruim não é sucesso (CAMPO-08)
+# --------------------------------------------------------------------------
+#
+# Sem piso, uma coleta em que TODAS as sondas falham — rede do executor fora,
+# não os alvos — gravava a série, regenerava o painel e commitava como
+# sucesso: "não medir" virando "registro de medição", a doutrina do projeto
+# violada na própria espinha. Os testes prendem a CLASSE (qualquer
+# conclusividade abaixo do piso, não só o caso extremo 0/30) e os dois lados:
+# abaixo do piso nada é gravado, no piso ou acima grava normalmente.
+
+
+@given(
+    total=st.integers(min_value=1, max_value=200),
+    conclusivas=st.integers(min_value=0, max_value=200),
+)
+@settings(max_examples=200)
+def test_piso_de_conclusividade_decide_pelos_dois_lados(total, conclusivas):
+    conclusivas = min(conclusivas, total)
+    motivo = coleta._recusar_por_piso_de_conclusividade(conclusivas, total)
+    taxa = conclusivas / total
+    if taxa < coleta.PISO_CONCLUSIVIDADE:
+        assert motivo is not None
+        assert f"{conclusivas}/{total}" in motivo
+    else:
+        assert motivo is None
+
+
+def test_piso_de_conclusividade_recusa_total_zero():
+    """Nenhuma sonda ter rodado não é diferente, para este fim, de todas terem falhado."""
+    assert coleta._recusar_por_piso_de_conclusividade(0, 0) is not None
+
+
+def test_piso_de_conclusividade_nunca_bloqueou_coleta_real():
+    """O piso fica bem abaixo do mínimo histórico — nunca é falso positivo contra a série real."""
+    serie = _DADOS / "serie.jsonl"
+    if not serie.exists():
+        pytest.skip("sem série real em dados/serie.jsonl")
+
+    momentos: dict[str, list[int]] = {}
+    for linha in serie.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha:
+            continue
+        registro = json.loads(linha)
+        estados = [e for e in registro["sondas"].values() if e != "pulada"]
+        contagem = momentos.setdefault(registro["coletado_em"], [0, 0])
+        contagem[0] += sum(1 for e in estados if e == "ok")
+        contagem[1] += len(estados)
+
+    assert momentos, "nenhuma coleta real em serie.jsonl"
+    recusas = [
+        m
+        for m, (ok, tot) in momentos.items()
+        if coleta._recusar_por_piso_de_conclusividade(ok, tot) is not None
+    ]
+    assert recusas == [], (
+        f"piso bloquearia coleta(s) real(is) que de fato aconteceram: {recusas[:5]}"
+    )
+
+
+def _observacao_com_status(status: str) -> dict:
+    """Observação mínima cujas sondas de hora têm todas o `status` dado."""
+    return {
+        "alvo": "alvo.teste",
+        "classe": "referencia",
+        "postura": {"nota": None},
+        "impressao": status,
+        "sondas": [{"sonda": s.sonda_nome, "status": status} for s in coleta.SONDAS_DE_HORA],
+    }
+
+
+def test_coleta_abaixo_do_piso_nao_escreve_nada(tmp_path, monkeypatch):
+    """Ponta a ponta: todas as sondas inconclusivas não grava nada e sai != 0.
+
+    Nem a série, nem o instantâneo, nem o diretório `--saida` — uma coleta
+    recusada não deixa rastro de que teria acontecido.
+    """
+    alvos_yml = tmp_path / "alvos.yml"
+    alvos_yml.write_text("- host: alvo.teste\n  classe: referencia\n", encoding="utf-8")
+    saida = tmp_path / "dados"
+
+    monkeypatch.setattr(
+        coleta, "observar", lambda alvo, completa=False: _observacao_com_status("inconclusivo")
+    )
+
+    codigo = coleta.principal(["--alvos", str(alvos_yml), "--saida", str(saida)])
+
+    assert codigo != 0
+    assert not saida.exists(), "coleta recusada não pode criar nem o diretório de saída"
+
+
+def test_coleta_acima_do_piso_grava_normalmente(tmp_path, monkeypatch):
+    """O dual: conclusividade acima do piso continua gravando série e instantâneo."""
+    alvos_yml = tmp_path / "alvos.yml"
+    alvos_yml.write_text("- host: alvo.teste\n  classe: referencia\n", encoding="utf-8")
+    saida = tmp_path / "dados"
+
+    monkeypatch.setattr(
+        coleta, "observar", lambda alvo, completa=False: _observacao_com_status("ok")
+    )
+
+    codigo = coleta.principal(["--alvos", str(alvos_yml), "--saida", str(saida)])
+
+    assert codigo == 0
+    assert (saida / "serie.jsonl").exists()
 
 
 if __name__ == "__main__":
