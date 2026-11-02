@@ -106,6 +106,33 @@ _SEM_VERSAO_LEGIVEL = (
     "nenhuma troca de versão pôde ser lida do diff — sem prova de que é não-major, não mescla"
 )
 
+# A chave de contexto mais recente antes de uma linha de versão genérica.
+#
+# O literal `<version>` cai na chave "version" (via o grupo nomeado acima),
+# e `"version"` em package-lock.json também — nos dois casos a chave lida
+# da própria linha não distingue um artefato do outro, só diz que é "uma
+# versão". Nos dois formatos o nome real mora na linha anterior
+# (`<artifactId>` no pom, a chave do objeto no lockfile), não na linha da
+# versão. Sem isso, dois artefatos diferentes no mesmo diff caem na mesma
+# chave genérica e um apaga o outro em silêncio — a classe que `CAMPO-09`
+# documentou: `dict-client-reference#12` saiu aprovado com um diff de dois
+# artefatos, um minor e um major, porque só a última leitura sobreviveu no
+# dicionário.
+_RE_ARTIFACT_ID = re.compile(r"^<artifactId>(?P<chave>[\w.-]+)</artifactId>$")
+_RE_CHAVE_LOCK = re.compile(r'^(?P<chave>[^"]+)":\s*\{\s*$')
+
+
+def _contexto(linha: str) -> str | None:
+    """Nome do artefato/pacote da linha de contexto mais próxima, se houver."""
+    if not linha or linha[0] not in "+- ":
+        return None
+    corpo = _corpo(linha)
+    for padrao in (_RE_ARTIFACT_ID, _RE_CHAVE_LOCK):
+        achado = padrao.match(corpo)
+        if achado:
+            return achado.group("chave").lower()
+    return None
+
 
 def _corpo(linha: str) -> str:
     """Conteúdo da linha de diff, sem o sinal e sem o que envolve a declaração.
@@ -126,13 +153,24 @@ def _corpo(linha: str) -> str:
     return re.sub(r'^["\']', "", corpo)
 
 
-def _extrair(linha: str) -> tuple[str, tuple[int, int]] | None:
-    """Nome e (major, minor) de uma linha de diff, se ela declarar versão."""
+def _extrair(linha: str, contexto: str | None) -> tuple[str, tuple[int, int]] | None:
+    """Nome e (major, minor) de uma linha de diff, se ela declarar versão.
+
+    `contexto` é o artefato visto na linha anterior (ver `_contexto`). Entra
+    na chave só quando a chave lida da própria linha é genérica — o literal
+    "version" do `<version>` de pom.xml ou do package-lock.json — porque
+    nos outros formatos, incluindo a propriedade Maven (`<spring.version>`),
+    a chave já é o nome real do artefato e não precisa de ajuda.
+    """
     corpo = _corpo(linha)
     for padrao in PADROES:
         achado = padrao.match(corpo)
         if achado:
-            chave = achado.groupdict().get("chave") or "<version>"
+            chave = achado.groupdict().get("chave")
+            generica = chave is None or chave.lower() == "version"
+            if generica:
+                base = chave or "<version>"
+                chave = f"{base}:{contexto}" if contexto else base
             return chave.lower(), (int(achado.group("maj")), int(achado.group("min") or 0))
     return None
 
@@ -148,26 +186,46 @@ def classificar(diff: str) -> tuple[bool, list[str]]:
     removidas: dict[str, tuple[int, int]] = {}
     adicionadas: dict[str, tuple[int, int]] = {}
     ilegiveis: list[str] = []
+    ambiguas: set[str] = set()
+    contexto: str | None = None
 
     for linha in diff.splitlines():
         if linha.startswith("---") or linha.startswith("+++"):
             continue
+
+        novo_contexto = _contexto(linha)
+        if novo_contexto is not None:
+            contexto = novo_contexto
+
         if not linha.startswith(("-", "+")):
             continue
 
-        extraido = _extrair(linha)
+        extraido = _extrair(linha, contexto)
         if extraido is None:
             if _parece_dependencia(linha):
                 ilegiveis.append(_corpo(linha))
             continue
 
+        chave, versao = extraido
         alvo = removidas if linha.startswith("-") else adicionadas
-        alvo[extraido[0]] = extraido[1]
+        if chave in alvo and alvo[chave] != versao:
+            # Duas leituras diferentes caindo na mesma chave: sem contexto
+            # para separar os artefatos, a segunda não pode simplesmente
+            # apagar a primeira — é a colisão que CAMPO-09 documentou.
+            ambiguas.add(chave)
+        alvo[chave] = versao
 
     if ilegiveis:
         return False, [
             "linha de dependência sem versão legível — sem prova de que é "
             "não-major, não mescla: " + "; ".join(sorted(set(ilegiveis))[:4])
+        ]
+
+    if ambiguas:
+        return False, [
+            "chave de versão colidiu entre leituras diferentes no mesmo "
+            "diff — sem contexto para distinguir os artefatos, não "
+            "mescla: " + ", ".join(sorted(ambiguas)[:4])
         ]
 
     comuns = sorted(set(removidas) & set(adicionadas))
