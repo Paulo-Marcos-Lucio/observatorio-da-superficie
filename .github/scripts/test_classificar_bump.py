@@ -201,6 +201,65 @@ CASOS = [
         "+    <spring.version>${next}</spring.version>\n",
         False,
     ),
+    # --- Chave genérica colidindo entre artefatos (CAMPO-09) ----------------
+    #
+    # O literal `<version>` (pom.xml) e `"version"` (package-lock.json) são
+    # chaves genéricas — dizem "isto é uma versão", não "de qual artefato".
+    # Sem contexto, dois artefatos no mesmo diff caem na mesma chave e um
+    # apaga o outro no dicionário: só a última leitura sobrevive. Diferente
+    # da propriedade Maven (`<spring.version>` etc., casos acima), que já
+    # tem nome próprio e não precisa de ajuda.
+    #
+    # O caso que importa é o segundo de cada par: o major vem PRIMEIRO e o
+    # minor depois. Era exatamente essa ordem que `dict-client-reference#12`
+    # tinha, e a versão antiga do classificador aprovava — o minor, por vir
+    # depois, apagava o major do dicionário antes da comparação.
+    (
+        "pom.xml, dois artefatos sem artifactId no diff — colisão explícita",
+        "-    <version>5.0.0</version>\n+    <version>6.0.0</version>\n"
+        "-    <version>3.2.5</version>\n+    <version>3.2.7</version>\n",
+        False,
+    ),
+    (
+        "pom.xml, dois artefatos com artifactId — contexto evita a colisão",
+        " <artifactId>motor-core</artifactId>\n"
+        "-    <version>5.0.0</version>\n+    <version>6.0.0</version>\n"
+        " <artifactId>motor-utils</artifactId>\n"
+        "-    <version>3.2.5</version>\n+    <version>3.2.7</version>\n",
+        False,
+    ),
+    (
+        "pom.xml, dois artefatos com artifactId, os dois minor — sem falso positivo",
+        " <artifactId>motor-core</artifactId>\n"
+        "-    <version>3.2.5</version>\n+    <version>3.2.7</version>\n"
+        " <artifactId>motor-utils</artifactId>\n"
+        "-    <version>1.0.0</version>\n+    <version>1.1.0</version>\n",
+        True,
+    ),
+    (
+        "package-lock.json, dois pacotes — mesma colisão, formato diferente",
+        '-    "node_modules/foo": {\n'
+        '-      "version": "5.0.0",\n'
+        '+    "node_modules/foo": {\n'
+        '+      "version": "6.0.0",\n'
+        '-    "node_modules/bar": {\n'
+        '-      "version": "3.2.5",\n'
+        '+    "node_modules/bar": {\n'
+        '+      "version": "3.2.7",\n',
+        False,
+    ),
+    (
+        "package-lock.json, dois pacotes, os dois minor — sem falso positivo",
+        '-    "node_modules/foo": {\n'
+        '-      "version": "3.2.5",\n'
+        '+    "node_modules/foo": {\n'
+        '+      "version": "3.2.7",\n'
+        '-    "node_modules/bar": {\n'
+        '-      "version": "1.0.0",\n'
+        '+    "node_modules/bar": {\n'
+        '+      "version": "1.1.0",\n',
+        True,
+    ),
 ]
 
 falhas = 0
