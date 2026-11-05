@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import random
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -875,21 +876,59 @@ def test_cabecalho_nao_ascii_e_barrado_antes_da_rede(sujo: str):
 _DADOS = Path(__file__).resolve().parent.parent / "dados"
 
 
-def _reconstruir_mozilla() -> tuple[dict[str, list[str]], list[tuple[str, ...]]]:
-    """Reconstrói, da série real, a política de www.mozilla.org e as ordens vistas.
+def _arquivos_recentes(janela_dias: int = 21) -> list[Path]:
+    """Os instantâneos de `dados/` dentro de uma janela recente, em ordem.
+
+    Reconstruir "a política real" de um alvo pressupõe que ela está estável —
+    isso vale sobre o PRESENTE, não sobre toda a história do projeto.
+    www.mozilla.org de fato mudou o conjunto de origens de `connect-src`,
+    `script-src` e `style-src` (domínios `transcend` entrando e saindo) até
+    2026-10-06, visível na série real — mudança de verdade, não ruído de
+    truncamento, e nenhuma canonização deveria fingir o contrário. Sem a
+    janela, a reconstrução vê os dois conjuntos ao mesmo tempo e a premissa de
+    "uma política só" — que sustenta os testes desta seção — deixa de valer.
+    A janela não escolhe um dia à mão: corta a partir do instantâneo mais
+    recente, então continua valendo conforme a série cresce.
+    """
+    arquivos = sorted(_DADOS.glob("*/*/*.json")) if _DADOS.exists() else []
+    if not arquivos:
+        return []
+
+    def _data(arquivo: Path) -> datetime | None:
+        try:
+            return datetime.strptime(arquivo.stem, "%Y-%m-%dT%H%MZ")
+        except ValueError:
+            return None
+
+    datados = [(a, _data(a)) for a in arquivos]
+    datas = [d for _, d in datados if d is not None]
+    if not datas:
+        return arquivos
+    corte = max(datas) - timedelta(days=janela_dias)
+    return [a for a, d in datados if d is not None and d >= corte]
+
+
+def _reconstruir_mozilla(
+    nome_cabecalho: str = "content-security-policy",
+) -> tuple[dict[str, list[str]], list[tuple[str, ...]]]:
+    """Reconstrói, da série real recente, a política de www.mozilla.org e as ordens vistas.
+
+    `nome_cabecalho` escolhe qual membro da família CSP ler — o de imposição
+    (`content-security-policy`) ou o de relatório
+    (`content-security-policy-report-only`); os dois embaralham a ordem de
+    diretiva da mesma forma, pela mesma causa.
 
     Devolve (política, ordens): `política` é `{diretiva: tokens ordenados}` e
     `ordens` é a lista cronológica das ordens de diretiva observadas (o prefixo
     legível de cada coleta; a última diretiva de um valor cortado em 600 é
     descartada porque pode estar truncada). O coletor de então só guardava a
     string cortada — a política íntegra é remontada da UNIÃO dos fragmentos,
-    válida justamente porque cada diretiva tem um único conteúdo na série.
+    válida justamente porque, dentro da janela recente, cada diretiva tem um
+    único conteúdo na série (ver `_arquivos_recentes`).
     """
     por_diretiva: dict[str, set[str]] = {}
     ordens: list[tuple[str, ...]] = []
-    if not _DADOS.exists():
-        return {}, []
-    for arquivo in sorted(_DADOS.glob("*/*/*.json")):
+    for arquivo in _arquivos_recentes():
         try:
             coletado = json.loads(arquivo.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -900,7 +939,7 @@ def _reconstruir_mozilla() -> tuple[dict[str, list[str]], list[tuple[str, ...]]]
             for s in obs["sondas"]:
                 if s["sonda"] != "cabecalhos" or s.get("status") != "ok":
                     continue
-                bruto = (s.get("cabecalhos") or {}).get("content-security-policy")
+                bruto = (s.get("cabecalhos") or {}).get(nome_cabecalho)
                 if not bruto:
                     continue
                 pedacos = [p.strip() for p in bruto.split(";") if p.strip()]
@@ -915,8 +954,11 @@ def _reconstruir_mozilla() -> tuple[dict[str, list[str]], list[tuple[str, ...]]]
     return politica, ordens
 
 
-_POL_MOZ, _ORDENS_MOZ = _reconstruir_mozilla()
+_POL_MOZ, _ORDENS_MOZ = _reconstruir_mozilla("content-security-policy")
 _DIRETIVAS_MOZ = sorted(_POL_MOZ)
+
+_POL_MOZ_CSPRO, _ORDENS_MOZ_CSPRO = _reconstruir_mozilla("content-security-policy-report-only")
+_DIRETIVAS_MOZ_CSPRO = sorted(_POL_MOZ_CSPRO)
 
 
 def _serializar(politica: dict[str, list[str]], ordem, rng: random.Random | None = None) -> str:
@@ -938,8 +980,13 @@ def _serializar(politica: dict[str, list[str]], ordem, rng: random.Random | None
     return "; ".join(itens)
 
 
-def _obs_csp(canonica) -> dict:
-    """Observação mínima cujo único sinal comparável é a CSP (via forma canônica)."""
+def _obs_csp(canonica, nome: str = "content-security-policy", campo: str = "csp") -> dict:
+    """Observação mínima cujo único sinal comparável é a CSP (via forma canônica).
+
+    `nome` é o cabeçalho (`content-security-policy` ou
+    `content-security-policy-report-only`); `campo` é o campo canônico
+    correspondente dentro da sonda `cabecalhos` (`csp` ou `csp_report_only`).
+    """
     return {
         "alvo": "www.mozilla.org",
         "classe": "referencia",
@@ -947,33 +994,38 @@ def _obs_csp(canonica) -> dict:
             {
                 "sonda": "cabecalhos",
                 "status": "ok",
-                # A string crua entra só para a CSP contar como cabeçalho comum;
+                # A string crua entra só para o cabeçalho contar como comum;
                 # a comparação de política olha a canônica, não este texto.
-                "cabecalhos": {"content-security-policy": "presente"},
+                "cabecalhos": {nome: "presente"},
                 "cookies": [],
                 "hsts": None,
-                "csp": {"canonica": canonica},
+                "csp": {"canonica": canonica} if campo == "csp" else None,
+                "csp_report_only": {"canonica": canonica} if campo == "csp_report_only" else None,
                 "csp_meta": None,
             }
         ],
     }
 
 
-def _diario_acusa_csp(mudancas: list[str]) -> bool:
-    return any("content-security-policy" in m for m in mudancas)
+def _diario_acusa_csp(mudancas: list[str], nome: str = "content-security-policy") -> bool:
+    return any(nome in m for m in mudancas)
 
 
 def test_serie_real_de_mozilla_tem_uma_politica_so():
     """Premissa empírica do CAMPO-07: uma política, muitas serializações.
 
-    Se um dia esta invariante quebrar (uma diretiva passar a ter dois conteúdos
-    reais na série), não é ruído de ordem — é mudança de verdade, e os testes
-    abaixo, que remontam a política da união dos fragmentos, deixariam de valer.
+    Vale sobre a janela recente de `_arquivos_recentes` — ver o porquê lá: a
+    série INTEIRA já viu mozilla.org mudar de verdade o conjunto de origens de
+    `connect-src`/`script-src`/`style-src` até 2026-10-06, e isso não é o que
+    este teste prende. Se esta invariante quebrar DENTRO da janela recente
+    (uma diretiva com dois conteúdos reais ao mesmo tempo), não é ruído de
+    ordem — é mudança de verdade, e os testes abaixo, que remontam a política
+    da união dos fragmentos, deixariam de valer.
     """
     if not _ORDENS_MOZ:
         pytest.skip("sem coletas de www.mozilla.org em dados/")
     por_diretiva: dict[str, set[tuple[str, ...]]] = {}
-    for arquivo in sorted(_DADOS.glob("*/*/*.json")):
+    for arquivo in _arquivos_recentes():
         try:
             coletado = json.loads(arquivo.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -1089,6 +1141,193 @@ def test_csp_rotacao_de_nonce_nao_muda_a_canonica():
     real = coleta._ler_csp("script-src 'nonce-XXXX'; object-src 'self' 'unsafe-inline'")
     assert real is not None
     assert real["canonica"] != a["canonica"]
+
+
+# --------------------------------------------------------------------------
+# 11. CSP-report-only é a MESMA classe, não um caso à parte (CAMPO-07)
+# --------------------------------------------------------------------------
+#
+# A correção de setembro só tratou `content-security-policy`. O
+# `content-security-policy-report-only` embaralha a ordem de diretiva pela
+# MESMA causa (é o mesmo servidor serializando a mesma forma de cabeçalho) e,
+# sem entrar na canonização, sozinho gerava a maior parte do ruído do
+# diário: 1173 linhas de "mudou de valor" na série real, contra 32 mudanças
+# reais do cabeçalho de imposição. Fechar só a metade "comum" da classe e
+# deixar a metade "report-only" aberta não ataca a classe — ataca o exemplo
+# que apareceu primeiro.
+
+
+def test_pares_reais_de_mozilla_nao_emitem_mudanca_de_csp_report_only():
+    """O mesmo teste de `content-security-policy`, para o cabeçalho de relatório."""
+    if len(_ORDENS_MOZ_CSPRO) < 2:
+        pytest.skip("menos de duas coletas com content-security-policy-report-only em dados/")
+
+    assert len(set(_ORDENS_MOZ_CSPRO)) > 1, (
+        "as ordens reais são todas iguais — o teste não estaria provando nada"
+    )
+
+    canonicas = [
+        coleta._canonizar_csp([_serializar(_POL_MOZ_CSPRO, ordem)]) for ordem in _ORDENS_MOZ_CSPRO
+    ]
+    observacoes = [
+        _obs_csp(c, nome="content-security-policy-report-only", campo="csp_report_only")
+        for c in canonicas
+    ]
+
+    acusacoes = sum(
+        1
+        for antes, agora in zip(observacoes, observacoes[1:], strict=False)
+        if _diario_acusa_csp(
+            painel.comparar(antes, agora), nome="content-security-policy-report-only"
+        )
+    )
+    assert acusacoes == 0, f"{acusacoes} pares consecutivos ainda acusaram mudança de report-only"
+
+
+@given(semente=st.integers(min_value=0, max_value=2**32 - 1))
+@settings(max_examples=60)
+def test_csp_report_only_reordenada_nao_e_mudanca(semente):
+    """Property-based sobre a política real de report-only, espelhando a de imposição."""
+    if len(_DIRETIVAS_MOZ_CSPRO) < 2:
+        pytest.skip("política real de report-only pequena demais para reordenar")
+
+    rng = random.Random(semente)
+    ordem_a = list(_DIRETIVAS_MOZ_CSPRO)
+    rng.shuffle(ordem_a)
+    ordem_b = list(_DIRETIVAS_MOZ_CSPRO)
+    rng.shuffle(ordem_b)
+
+    a = _obs_csp(
+        coleta._canonizar_csp([_serializar(_POL_MOZ_CSPRO, ordem_a, rng)]),
+        nome="content-security-policy-report-only",
+        campo="csp_report_only",
+    )
+    b = _obs_csp(
+        coleta._canonizar_csp([_serializar(_POL_MOZ_CSPRO, ordem_b, rng)]),
+        nome="content-security-policy-report-only",
+        campo="csp_report_only",
+    )
+
+    assert not _diario_acusa_csp(painel.comparar(a, b), nome="content-security-policy-report-only")
+
+
+def test_mudanca_no_conjunto_de_tokens_do_report_only_e_detectada():
+    """O dual: silenciar ordem não pode silenciar mudança real no report-only."""
+    if not _POL_MOZ_CSPRO:
+        pytest.skip("sem política real de content-security-policy-report-only")
+
+    diretiva = next((d for d, t in _POL_MOZ_CSPRO.items() if len(t) > 1), None)
+    if diretiva is None:
+        pytest.skip("nenhuma diretiva com mais de um token para mutar")
+
+    politica_mutada = dict(_POL_MOZ_CSPRO)
+    politica_mutada[diretiva] = _POL_MOZ_CSPRO[diretiva][:-1]
+
+    kwargs = {"nome": "content-security-policy-report-only", "campo": "csp_report_only"}
+    base = _obs_csp(
+        coleta._canonizar_csp([_serializar(_POL_MOZ_CSPRO, sorted(_POL_MOZ_CSPRO))]), **kwargs
+    )
+    mutada = _obs_csp(
+        coleta._canonizar_csp([_serializar(politica_mutada, sorted(politica_mutada))]), **kwargs
+    )
+
+    mudancas = painel.comparar(base, mutada)
+    assert _diario_acusa_csp(mudancas, nome="content-security-policy-report-only")
+    assert any("política" in m for m in mudancas)
+
+
+# --------------------------------------------------------------------------
+# 12. A impressão digital não pode reagir ao ruído que o diário já ignora
+# --------------------------------------------------------------------------
+#
+# Canonizar a COMPARAÇÃO do diário (seções 10 e 11) resolve a mensagem que o
+# humano lê, mas não resolve a GRAVAÇÃO: `coleta.py` decide se vale guardar um
+# instantâneo novo comparando a impressão digital de agora com a de antes, e
+# até esta correção essa impressão incluía o texto bruto de `cabecalhos`
+# (truncado em 600, na ordem que o servidor embaralha) — o mesmo dado que a
+# canonização existe para neutralizar, só que por uma porta que a canonização
+# não cobria. Medido na série real: o instantâneo era gravado em 98,5% das
+# coletas (1257 de 1276), quando o próprio desenho diz "só quando mudar".
+
+
+def _observacao_cabecalhos(csp_bruto: str, csp_canonica, cspro_bruto: str, cspro_canonica) -> dict:
+    """Observação mínima com os DOIS cabeçalhos da família CSP preenchidos."""
+    return {
+        "alvo": "www.mozilla.org",
+        "classe": "referencia",
+        "sondas": [
+            {
+                "sonda": "cabecalhos",
+                "status": "ok",
+                "codigo": 200,
+                "cabecalhos": {
+                    "content-security-policy": csp_bruto,
+                    "content-security-policy-report-only": cspro_bruto,
+                },
+                "cookies": [],
+                "hsts": None,
+                "csp": {"canonica": csp_canonica},
+                "csp_report_only": {"canonica": cspro_canonica},
+                "csp_meta": None,
+            }
+        ],
+    }
+
+
+@given(semente=st.integers(min_value=0, max_value=2**32 - 1))
+@settings(max_examples=40)
+def test_impressao_ignora_reordenacao_da_familia_csp(semente):
+    """A MESMA política, serializada em ordens diferentes nos dois cabeçalhos
+    da família CSP, tem que produzir a MESMA impressão digital — senão o
+    instantâneo volta a ser gravado quase sempre, como media a série real.
+    """
+    if len(_DIRETIVAS_MOZ) < 2 or len(_DIRETIVAS_MOZ_CSPRO) < 2:
+        pytest.skip("política real pequena demais para reordenar nos dois cabeçalhos")
+
+    rng = random.Random(semente)
+
+    def uma_observacao() -> dict:
+        ordem_csp = list(_DIRETIVAS_MOZ)
+        rng.shuffle(ordem_csp)
+        ordem_cspro = list(_DIRETIVAS_MOZ_CSPRO)
+        rng.shuffle(ordem_cspro)
+        return _observacao_cabecalhos(
+            csp_bruto=_serializar(_POL_MOZ, ordem_csp, rng),
+            csp_canonica=coleta._canonizar_csp([_serializar(_POL_MOZ, ordem_csp)]),
+            cspro_bruto=_serializar(_POL_MOZ_CSPRO, ordem_cspro, rng),
+            cspro_canonica=coleta._canonizar_csp([_serializar(_POL_MOZ_CSPRO, ordem_cspro)]),
+        )
+
+    a, b = uma_observacao(), uma_observacao()
+    assert coleta._impressao(a) == coleta._impressao(b)
+
+
+def test_impressao_muda_quando_o_conjunto_de_tokens_da_csp_muda():
+    """O dual do teste acima: ignorar ordem não pode cegar a impressão para
+    uma mudança real no conjunto de tokens.
+    """
+    if not _POL_MOZ:
+        pytest.skip("sem política real de content-security-policy")
+
+    diretiva = next((d for d, t in _POL_MOZ.items() if len(t) > 1), None)
+    if diretiva is None:
+        pytest.skip("nenhuma diretiva com mais de um token para mutar")
+
+    def observacao(politica) -> dict:
+        ordem = sorted(politica)
+        return _observacao_cabecalhos(
+            csp_bruto=_serializar(politica, ordem),
+            csp_canonica=coleta._canonizar_csp([_serializar(politica, ordem)]),
+            cspro_bruto="",
+            cspro_canonica=None,
+        )
+
+    base = observacao(_POL_MOZ)
+    politica_mutada = dict(_POL_MOZ)
+    politica_mutada[diretiva] = _POL_MOZ[diretiva][:-1]
+    mutada = observacao(politica_mutada)
+
+    assert coleta._impressao(base) != coleta._impressao(mutada)
 
 
 if __name__ == "__main__":

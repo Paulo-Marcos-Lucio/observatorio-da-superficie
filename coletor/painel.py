@@ -89,20 +89,35 @@ def _mudanca_de_endereco(antes: list[str] | None, agora: list[str] | None) -> bo
     return not (antes_c & agora_c)
 
 
-def _csp_mudou(a_cab: dict[str, Any], b_cab: dict[str, Any]) -> bool | None:
-    """A política CSP mudou de fato, ignorando a ordem de serialização?
+# Os dois cabeçalhos da família CSP e o campo, dentro da sonda `cabecalhos`,
+# que guarda a forma canônica de cada um. `content-security-policy-report-only`
+# embaralha a ordem de diretiva/token exatamente como o de imposição — mesma
+# causa, mesmo efeito — e sem entrar aqui ele sozinho gerava a maior parte do
+# ruído do diário (1173 das linhas de "mudou de valor" na série real, contra
+# 32 mudanças reais de `content-security-policy`).
+_CAMPO_CANONICO_CSP = {
+    "content-security-policy": "csp",
+    "content-security-policy-report-only": "csp_report_only",
+}
+
+
+def _csp_mudou(a_cab: dict[str, Any], b_cab: dict[str, Any], campo: str) -> bool | None:
+    """A política CSP (ou CSP-report-only) mudou de fato, ignorando a ordem de serialização?
 
     Compara a forma canônica que o coletor grava a partir do valor íntegro
     (`{diretiva: tokens ordenados}`), não a string crua cortada em 600. Duas
     serializações da mesma política — diretivas em outra ordem, tokens em outra
     ordem, nonce diferente — têm a MESMA canônica e não são mudança.
 
+    `campo` é `csp` ou `csp_report_only`, o nome do campo canônico correspondente
+    dentro da sonda `cabecalhos`.
+
     Devolve `None` quando não há forma canônica dos dois lados (coleta de schema
     antigo, anterior a este campo): aí quem chama decide o fail-closed, porque
     não medir não é medir ausência.
     """
-    canon_a = (a_cab.get("csp") or {}).get("canonica")
-    canon_b = (b_cab.get("csp") or {}).get("canonica")
+    canon_a = (a_cab.get(campo) or {}).get("canonica")
+    canon_b = (b_cab.get(campo) or {}).get("canonica")
     if canon_a is None or canon_b is None:
         return None
     return canon_a != canon_b
@@ -151,19 +166,20 @@ def comparar(antes: dict[str, Any], agora: dict[str, Any]) -> list[str]:
         for nome in sorted(set(antigos) - set(novos)):
             mudancas.append(f"**parou de enviar `{nome}`**")
         for nome in sorted(set(antigos) & set(novos)):
-            # A CSP não se compara pela string crua. A mesma política reaparece
-            # a cada resposta com as diretivas em outra ordem, e a string
-            # cortada em 600 ainda troca de conteúdo conforme o corte cai numa
-            # diretiva ou noutra — medido: quase toda coleta de mozilla.org
-            # acusava "a CSP mudou" sem que a política tivesse mexido. A
-            # comparação canônica (conjunto de tokens por diretiva, sobre o
-            # valor íntegro) faz reordenação parar de virar linha de diário;
-            # mudança real no conjunto de tokens continua virando.
-            if nome == "content-security-policy":
-                mudou = _csp_mudou(a_cab, b_cab)
+            # Nenhum cabeçalho da família CSP se compara pela string crua. A
+            # mesma política reaparece a cada resposta com as diretivas em
+            # outra ordem, e a string cortada em 600 ainda troca de conteúdo
+            # conforme o corte cai numa diretiva ou noutra — medido: quase toda
+            # coleta de mozilla.org acusava "mudou" sem que a política tivesse
+            # mexido. A comparação canônica (conjunto de tokens por diretiva,
+            # sobre o valor íntegro) faz reordenação parar de virar linha de
+            # diário; mudança real no conjunto de tokens continua virando.
+            campo_canonico = _CAMPO_CANONICO_CSP.get(nome)
+            if campo_canonico:
+                mudou = _csp_mudou(a_cab, b_cab, campo_canonico)
                 if mudou is True:
                     mudancas.append(
-                        "`content-security-policy` mudou de política "
+                        f"`{nome}` mudou de política "
                         "(o conjunto de diretivas/tokens, não só a ordem)"
                     )
                 elif mudou is None and _normalizar(antigos[nome]) != _normalizar(novos[nome]):
