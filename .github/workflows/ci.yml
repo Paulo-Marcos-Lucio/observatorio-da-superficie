@@ -41,9 +41,16 @@ jobs:
 
   coleta-a-seco:
     # O coletor precisa continuar importável e executável mesmo que a rede
-    # falhe. Este job roda contra um alvo que não existe: o esperado é que
-    # todas as sondas voltem `inconclusivo` e o processo saia com 0 — se ele
-    # explodir, a coleta diária morreria inteira por causa de um alvo ruim.
+    # falhe — isto é testado chamando `observar()` em processo, sem passar
+    # pelo CLI: uma sonda nunca pode propagar exceção (doutrina: nenhuma sonda
+    # devolve silêncio), e isso vale INDEPENDENTE de quantos alvos estão
+    # sendo coletados.
+    #
+    # O CLI completo é testado separadamente: um alvo só, 100% inconclusivo,
+    # é exatamente o cenário que o piso de conclusividade (CAMPO-08) existe
+    # para recusar — a coleta não deve gravar nada nem sair com 0. Antes de
+    # CAMPO-08 este job esperava sair 0; o piso mudou essa doutrina de
+    # propósito, então o job passou a testar a recusa, não mais o sucesso.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,17 +58,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Alvo inexistente não derruba a coleta
+      - name: Sonda não propaga exceção para um alvo que não resolve
         run: |
           set -euo pipefail
-          printf -- '- host: alvo-que-nao-existe.invalid\n  classe: proprio\n  justificativa: "teste"\n' > /tmp/alvos-teste.yml
-          python coletor/coleta.py --alvos /tmp/alvos-teste.yml --saida /tmp/dados-teste
           python - <<'PY'
-          import json, pathlib
+          import sys
 
-          arquivo = next(pathlib.Path("/tmp/dados-teste").glob("*/*/*.json"))
-          coleta = json.loads(arquivo.read_text(encoding="utf-8"))
-          observacao = coleta["observacoes"][0]
+          sys.path.insert(0, "coletor")
+          import coleta
+
+          alvo = {"host": "alvo-que-nao-existe.invalid", "classe": "proprio"}
+          observacao = coleta.observar(alvo)
           sondas = {s["sonda"]: s for s in observacao["sondas"]}
 
           # As sondas que precisam falar com o host não têm como concluir nada
@@ -82,5 +89,23 @@ jobs:
                   assert sonda.get("motivo"), f"{nome}: inconclusivo sem motivo é silêncio"
 
           assert observacao["postura"]["nota"] is None, "alvo inalcançável não pode ter nota"
-          print("ok — alvo inalcançável vira inconclusivo com motivo, sem nota")
+          print("ok — alvo inalcançável vira inconclusivo com motivo, sem nota (sonda não explode)")
           PY
+
+      - name: Coleta 100% inconclusiva é recusada, não comitada como sucesso
+        run: |
+          set -uo pipefail
+          printf -- '- host: alvo-que-nao-existe.invalid\n  classe: proprio\n  justificativa: "teste"\n' > /tmp/alvos-teste.yml
+
+          codigo=0
+          python coletor/coleta.py --alvos /tmp/alvos-teste.yml --saida /tmp/dados-teste-piso || codigo=$?
+
+          if [ "$codigo" -eq 0 ]; then
+            echo "::error::coleta de um alvo 100% inconclusivo deveria ter sido recusada pelo piso de conclusividade"
+            exit 1
+          fi
+          if [ -e /tmp/dados-teste-piso ]; then
+            echo "::error::coleta recusada pelo piso não deveria ter escrito nada em --saida"
+            exit 1
+          fi
+          echo "ok — coleta 100% inconclusiva foi recusada (saída ${codigo}), nada escrito em --saida"

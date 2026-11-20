@@ -774,6 +774,38 @@ SONDAS_DO_DIA = [
 ]
 
 
+# Piso declarado de conclusividade: abaixo disto, a coleta não grava nada.
+#
+# Medido na série real (1276 coletas desde 11/08): a conclusividade NUNCA
+# caiu abaixo de 63,9%, nem nos piores dias de instabilidade do começo do
+# projeto. Uma coleta abaixo da metade não está medindo um alvo ruim — está
+# medindo a PRÓPRIA rede do executor (DNS fora, firewall do runner,
+# resolvedor quebrado). Gravar isso como "coleta bem-sucedida, X/30 sondas
+# conclusivas" é a doutrina do projeto violada na própria espinha: não medir
+# virando registro de medição. 50% fica bem abaixo do mínimo histórico real,
+# então nunca bloqueou uma coleta genuína — só o apagão total que o item
+# mediu (0/30).
+PISO_CONCLUSIVIDADE = 0.5
+
+
+def _recusar_por_piso_de_conclusividade(conclusivas: int, total: int) -> str | None:
+    """O motivo da recusa, ou `None` se a coleta pode ser gravada.
+
+    `total == 0` (nenhuma sonda rodou — todas puladas, ou zero alvos) também é
+    recusa: não há nada que sustente gravar fosse o que fosse.
+    """
+    if total == 0:
+        return "nenhuma sonda rodou (0 alvos, ou todas puladas) — nada a gravar"
+    taxa = conclusivas / total
+    if taxa < PISO_CONCLUSIVIDADE:
+        return (
+            f"conclusividade {conclusivas}/{total} ({taxa:.0%}) abaixo do piso "
+            f"declarado de {PISO_CONCLUSIVIDADE:.0%} — isto não mede os alvos, "
+            "mede a rede do executor; nada foi gravado"
+        )
+    return None
+
+
 def _pulada(nome: str, motivo: str) -> dict[str, Any]:
     """Sonda que não rodou nesta coleta.
 
@@ -1080,12 +1112,23 @@ def principal(argv: list[str] | None = None) -> int:
     }
 
     destino = Path(argumentos.saida)
-    destino.mkdir(parents=True, exist_ok=True)
     anteriores = _ultima_impressao(destino)
 
     for alvo in alvos:
         print(f"  observando {alvo['host']} ...", file=sys.stderr, flush=True)
         coleta["observacoes"].append(observar(alvo, completa=argumentos.completa))
+
+    conclusivas = sum(1 for o in coleta["observacoes"] for s in o["sondas"] if s["status"] == "ok")
+    total = sum(1 for o in coleta["observacoes"] for s in o["sondas"] if s["status"] != "pulada")
+
+    # O piso é checado ANTES de qualquer `mkdir`/escrita: uma coleta recusada
+    # não deixa rastro nenhum em `--saida`, nem o diretório vazio.
+    recusa = _recusar_por_piso_de_conclusividade(conclusivas, total)
+    if recusa:
+        print(f"::error::coleta recusada — {recusa}", file=sys.stderr)
+        return 3
+
+    destino.mkdir(parents=True, exist_ok=True)
 
     # A série é o arquivo permanente: uma linha compacta por alvo por coleta,
     # sempre. É ela que sustenta a afirmação "medimos de hora em hora".
@@ -1127,8 +1170,6 @@ def principal(argv: list[str] | None = None) -> int:
             json.dumps(coleta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
 
-    conclusivas = sum(1 for o in coleta["observacoes"] for s in o["sondas"] if s["status"] == "ok")
-    total = sum(1 for o in coleta["observacoes"] for s in o["sondas"] if s["status"] != "pulada")
     motivo = "coleta completa" if argumentos.completa else f"mudou: {', '.join(mudou)}"
     print(
         f"série: {len(coleta['observacoes'])} observações, "
